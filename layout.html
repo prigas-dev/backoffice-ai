@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ .Title }}</title>
+    <!-- Bootstrap 5 CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      .hero-section {
+        background-color: #f8f9fa;
+        padding: 100px 0;
+        margin-bottom: 30px;
+      }
+      footer {
+        margin-top: 50px;
+        padding: 20px 0;
+        background-color: #f8f9fa;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+      <div class="container">
+        <a class="navbar-brand" href="/">{{ .Title }}</a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNav"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto">
+            <!-- Dynamic Navigation Links -->
+            {{range .NavLinks}}
+            <li class="nav-item">
+              <a class="nav-link" href="{{.URL}}">{{.Text}}</a>
+            </li>
+            {{end}}
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero-section text-center">
+      <div class="container">
+        <h1>{{.Title}}</h1>
+        <p class="lead">
+          {{block "hero-subtitle" .}}Building a better tomorrow{{end}}
+        </p>
+      </div>
+    </section>
+
+    <!-- Main Content -->
+    <main class="container">
+      <div class="row">
+        <div class="col-md-8">
+          {{block "main-content" .}}
+          <h2>Welcome</h2>
+          <p>{{.Content}}</p>
+          {{end}}
+        </div>
+        <div class="col-md-4">
+          {{block "sidebar" .}}
+          <div class="card">
+            <div class="card-header">Quick Info</div>
+            <div class="card-body">
+              <p>
+                Learn more about our services and how we can help you achieve
+                your goals.
+              </p>
+              <a href="/contact" class="btn btn-primary">Contact Us</a>
+            </div>
+          </div>
+          {{end}}
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center">
+      <div class="container">
+        <p>&copy; 2025 {{.Title}}. All rights reserved.</p>
+      </div>
+    </footer>
+
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>

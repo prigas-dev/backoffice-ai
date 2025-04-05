@@ -1,0 +1,7 @@
+{
+  "name": "@prigas/backoffice-ai-sample-components",
+  "type": "module",
+  "devDependencies": {
+    "@types/react": "^19.1.0"
+  }
+}

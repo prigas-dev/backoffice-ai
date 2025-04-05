@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "strict": true,
+    "isolatedModules": true
+  },
+  "include": ["./sample/*.tsx"]
+}

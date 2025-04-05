@@ -32,3 +32,27 @@ type User struct {
 	Email string
 	Tasks []Task `gorm:"many2many:user_tasks;"`
 }
+
+type Page struct {
+	gorm.Model
+	Title string
+	Path  string
+}
+
+type PageComponent struct {
+	gorm.Model
+
+	Page   Page
+	PageID uint
+
+	Component   Component
+	ComponentID uint
+
+	Query string
+}
+
+type Component struct {
+	gorm.Model
+
+	HTML string
+}

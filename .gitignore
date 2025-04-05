@@ -1,1 +1,6 @@
 .env
+tmp
+node_modules
+/backoffice-ai
+/backoffice-ai.exe
+public
