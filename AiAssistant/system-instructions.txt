@@ -8,6 +8,13 @@ For SQL generation, you have to write queries for SQLite 3 based on the followin
 {{.DatabaseSchema}}
 </Database_Schema>
 
+{{- if .DatabaseHints }}
+Here are some hints about the database that will help you with the queries:
+<Database_Hints>
+{{.DatabaseHints}}
+</Database_Hints>
+{{- end }}
+
 The component will be used in a virtual environment, where no developer has access to, so there are some restrictions on what you can do in the component code. Follow these rules to generate React components code:
 - These are the only packages you are allowed to import from:
   - react

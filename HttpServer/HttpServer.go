@@ -12,6 +12,7 @@ import (
 
 	"github.com/prigas-dev/backoffice-ai/AiAssistant"
 	"github.com/prigas-dev/backoffice-ai/ComponentGenerator"
+	"github.com/prigas-dev/backoffice-ai/ViewCreator"
 )
 
 //go:embed index.html
@@ -66,7 +67,7 @@ func Start(ctx context.Context, db *sql.DB) {
 			return
 		}
 
-		result, err := AiAssistant.Assist(ctx, db, prompt)
+		result, err := AiAssistant.Assist(ctx, db, prompt, "")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -100,7 +101,7 @@ func Start(ctx context.Context, db *sql.DB) {
 		props := map[string]any{}
 
 		for _, query := range p.Queries {
-			rows, err := RunQuery(db, query)
+			rows, err := ViewCreator.RunQuery(db, query)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -119,52 +120,30 @@ func Start(ctx context.Context, db *sql.DB) {
 		json.NewEncoder(w).Encode(props)
 	})
 
+	http.HandleFunc("/new-view", func(w http.ResponseWriter, r *http.Request) {
+		err := r.ParseForm()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		prompt := r.Form.Get("prompt")
+		if len(prompt) == 0 {
+			http.Error(w, "prompt is required", http.StatusBadRequest)
+			return
+		}
+
+		props, err := ViewCreator.CreateView(ctx, db, prompt)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(props)
+	})
+
 	// Start the web server
 	log.Println("Server starting on http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
-}
-
-func RunQuery(db *sql.DB, query AiAssistant.Query) ([]map[string]any, error) {
-	rows, err := db.Query(query.SQL)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	columns, err := rows.Columns()
-	if err != nil {
-		return nil, err
-	}
-
-	scannedRows := []map[string]any{}
-	for rows.Next() {
-		values := make([]any, len(columns))
-		scanArgs := make([]any, len(columns))
-		for i := range values {
-			scanArgs[i] = &values[i]
-		}
-
-		err := rows.Scan(scanArgs...)
-		if err != nil {
-			return nil, err
-		}
-
-		mapValues := map[string]any{}
-		for i, val := range values {
-			// Ensuring byte slices are converted to string
-			if b, ok := val.([]byte); ok {
-				values[i] = string(b)
-			}
-
-			mapValues[columns[i]] = values[i]
-		}
-
-		scannedRows = append(scannedRows, mapValues)
-	}
-	err = rows.Err()
-	if err != nil {
-		return nil, err
-	}
-
-	return scannedRows, nil
 }

@@ -29,13 +29,25 @@
   </head>
   <body>
     <div class="container">
-      <div class="row justify-content-center">
+      <div class="row">
         <div class="col">
-          <button id="reload-button" class="btn btn-primary">Recarregar</button>
+          <form id="create-view-form" autocomplete="off">
+            <div class="mb-3">
+              <label for="prompt" class="form-label">Prompt</label>
+              <input
+                type="text"
+                class="form-control"
+                id="prompt-input"
+                name="prompt"
+                placeholder="Show me all tasks with due date until today"
+              />
+            </div>
+            <button type="submit" class="btn btn-primary">Submit</button>
+          </form>
         </div>
-        <div id="root"></div>
       </div>
     </div>
+    <div id="root" class="mt-4 container"></div>
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
       integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
@@ -46,19 +58,44 @@
       import { createRoot } from "react-dom/client";
       import { jsx as h, jsxs as hs } from "react/jsx-runtime";
       import { useState } from "react";
+      import Spinner from "react-bootstrap/Spinner";
+      import Container from "react-bootstrap/Container";
+      import Row from "react-bootstrap/Row";
+      import Col from "react-bootstrap/Col";
 
       const root = createRoot(document.getElementById("root"));
 
+      /**
+       * @type {HTMLFormElement}
+       */
+      const createViewForm = document.getElementById("create-view-form");
+      /**
+       * @type {HTMLButtonElement}
+       */
+      const submitButton = createViewForm.querySelector("button[type=submit]");
+
       let isLoading = false;
-      const reloadButton = document.getElementById("reload-button");
-      reloadButton.addEventListener("click", async function () {
+      createViewForm.addEventListener("submit", async function (evt) {
+        evt.preventDefault();
+
         if (isLoading) {
           return;
         }
+
         isLoading = true;
-        reloadButton.disabled = true;
+        submitButton.disabled = true;
+
+        reactComponentLoading();
+
         try {
-          const response = await fetch("/test-load-view");
+          const formData = new FormData(createViewForm);
+          const response = await fetch("/new-view", {
+            method: "post",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams(formData),
+          });
           if (!response.ok) {
             const message = await response.text();
             throw new Error(`[${response.status}] ${message}`);
@@ -68,11 +105,43 @@
         } catch (error) {
           alert(error.message);
           console.error(error);
+
+          reactComponentWaiting();
         } finally {
           isLoading = false;
-          reloadButton.disabled = false;
+          submitButton.disabled = false;
         }
       });
+
+      function reactComponentLoading() {
+        root.render(
+          h(Container, {
+            children: h(Row, {
+              className: "justify-content-center",
+              children: h(Col, {
+                xs: "auto",
+                children: h(Spinner, { animation: "grow", variant: "success" }),
+              }),
+            }),
+          })
+        );
+      }
+
+      function reactComponentWaiting() {
+        root.render(
+          h(Container, {
+            children: h(Row, {
+              className: "justify-content-center",
+              children: h(Col, {
+                xs: "auto",
+                children: "Prompt!",
+              }),
+            }),
+          })
+        );
+      }
+
+      reactComponentWaiting();
 
       async function updateReactComponent(props) {
         const mod = await import(`./public/component.mjs?t=${Date.now()}`);

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"text/template"
 
 	_ "embed"
@@ -19,7 +20,7 @@ var systemInstructionsTmpl string
 
 var ErrNoValidAnthropicResponse = errors.New("anthropic did not return any valid response")
 
-func Assist(ctx context.Context, db *sql.DB, prompt string) (*PageComponentView, error) {
+func Assist(ctx context.Context, db *sql.DB, prompt string, databaseHints string) (*PageComponentView, error) {
 
 	client := anthropic.NewClient()
 
@@ -28,17 +29,23 @@ func Assist(ctx context.Context, db *sql.DB, prompt string) (*PageComponentView,
 		return nil, fmt.Errorf("failed to get db schema: %w", err)
 	}
 
+	log.Println("Got schema from SQLite3 database")
+
 	tmpl, err := template.New("system-instructions").Parse(systemInstructionsTmpl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse instructions template: %w", err)
 	}
 
+	log.Println("Parsed system-instructions template")
+
 	var instructionsBuffer bytes.Buffer
 	type TemplateData struct {
 		DatabaseSchema string
+		DatabaseHints  string
 	}
 	data := TemplateData{
 		DatabaseSchema: schema,
+		DatabaseHints:  databaseHints,
 	}
 	err = tmpl.Execute(&instructionsBuffer, data)
 	if err != nil {
@@ -46,6 +53,8 @@ func Assist(ctx context.Context, db *sql.DB, prompt string) (*PageComponentView,
 	}
 
 	instructions := instructionsBuffer.String()
+
+	log.Println("Executed template successfuly")
 
 	messages := []anthropic.MessageParam{
 		{
@@ -72,15 +81,29 @@ func Assist(ctx context.Context, db *sql.DB, prompt string) (*PageComponentView,
 		return nil, fmt.Errorf("failed to connect to anthropic: %w", err)
 	}
 
+	log.Println("Got response from anthropic")
+
 	var lastErr error = nil
 
 	for _, block := range anthropicResponse.Content {
 		switch block := block.AsAny().(type) {
 		case anthropic.TextBlock:
-			pageComponentView := &PageComponentView{}
-			err := json.Unmarshal([]byte(block.Text), pageComponentView)
+
+			log.Println(block.Text)
+
+			errorStructure := &ErrorStructure{}
+			err := json.Unmarshal([]byte(block.Text), errorStructure)
 			if err == nil {
-				// TODO handle error response case scenario
+				if len(errorStructure.Error) > 0 {
+					log.Println("Anthropic could not generate the view")
+					return nil, fmt.Errorf("anthropic error: %s", errorStructure.Error)
+				}
+			}
+
+			pageComponentView := &PageComponentView{}
+			err = json.Unmarshal([]byte(block.Text), pageComponentView)
+			if err == nil {
+				log.Println("Successfully parsed anthropic response")
 				return pageComponentView, nil
 			}
 
@@ -116,4 +139,8 @@ type Component struct {
 type PageComponentView struct {
 	Queries   []Query   `json:"queries"`
 	Component Component `json:"component"`
+}
+
+type ErrorStructure struct {
+	Error string `json:"error"`
 }
