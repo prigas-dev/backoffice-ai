@@ -109,7 +109,7 @@ type Query struct {
 }
 
 type Component struct {
-	ID   string `json:"id"`   // Snake-case string identifier
+	ID   string `json:"id"`   // snake_case string identifier
 	Code string `json:"code"` // TSX code
 }
 

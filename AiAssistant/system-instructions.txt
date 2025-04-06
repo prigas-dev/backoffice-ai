@@ -36,7 +36,7 @@ Your answer has to be structure in a way that a program will extract the informa
     }
   ],
   "component": {
-    "id": "<component-id>", // A snake-case string identifier for the component for later access
+    "id": "<component-id>", // A snake_case string identifier for the component for later access
     "code": "<tsx-code>"
   }
 }

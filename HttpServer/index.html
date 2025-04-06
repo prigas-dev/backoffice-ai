@@ -47,16 +47,6 @@
       import { jsx as h, jsxs as hs } from "react/jsx-runtime";
       import { useState } from "react";
 
-      function Banana() {
-        const [count, setCount] = useState(0);
-        return hs("div", {
-          children: [
-            h("button", { onClick: () => setCount(count + 1), children: "+" }),
-            count,
-          ],
-        });
-      }
-
       const root = createRoot(document.getElementById("root"));
 
       let isLoading = false;
@@ -68,14 +58,13 @@
         isLoading = true;
         reloadButton.disabled = true;
         try {
-          const response = await fetch("/generate-component", {
-            method: "post",
-          });
+          const response = await fetch("/test-load-view");
           if (!response.ok) {
             const message = await response.text();
             throw new Error(`[${response.status}] ${message}`);
           }
-          await updateReactComponent();
+          const props = await response.json();
+          await updateReactComponent(props);
         } catch (error) {
           alert(error.message);
           console.error(error);
@@ -85,9 +74,9 @@
         }
       });
 
-      async function updateReactComponent() {
+      async function updateReactComponent(props) {
         const mod = await import(`./public/component.mjs?t=${Date.now()}`);
-        root.render(h(mod.Component, {}));
+        root.render(h(mod.Component, props));
       }
     </script>
   </body>

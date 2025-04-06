@@ -19,7 +19,36 @@ var sampleComponents embed.FS
 
 var ErrNoTsxFiles = errors.New("no tsx file found")
 
-func GenerateComponent(publicFolder string) error {
+func GenerateComponentTSX(tsx string, publicFolder string) error {
+	result := api.Transform(tsx, api.TransformOptions{
+		Loader: api.LoaderTSX,
+		JSX:    api.JSXAutomatic,
+	})
+
+	log.Printf("%d errors and %d warnings\n",
+		len(result.Errors), len(result.Warnings))
+
+	if len(result.Errors) > 0 {
+		return fmt.Errorf("JSX transform errors: %+v", result.Errors)
+	}
+
+	err := os.MkdirAll(publicFolder, 0660)
+	if err != nil {
+		return fmt.Errorf("failed to create public folder: %w", err)
+	}
+
+	output, err := os.Create(path.Join(publicFolder, "component.mjs"))
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %v", err)
+	}
+	defer output.Close()
+
+	output.Write(result.Code)
+
+	return nil
+}
+
+func GenerateComponentSample(publicFolder string) error {
 
 	files, err := sampleComponents.ReadDir("sample")
 	if err != nil {
@@ -62,32 +91,7 @@ func GenerateComponent(publicFolder string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
 	}
-	jsx := string(bytes)
+	tsx := string(bytes)
 
-	result := api.Transform(jsx, api.TransformOptions{
-		Loader: api.LoaderTSX,
-		JSX:    api.JSXAutomatic,
-	})
-
-	log.Printf("%d errors and %d warnings\n",
-		len(result.Errors), len(result.Warnings))
-
-	if len(result.Errors) > 0 {
-		return fmt.Errorf("JSX transform errors: %+v", result.Errors)
-	}
-
-	err = os.MkdirAll(publicFolder, 0660)
-	if err != nil {
-		return fmt.Errorf("failed to create public folder: %w", err)
-	}
-
-	output, err := os.Create(path.Join(publicFolder, "component.mjs"))
-	if err != nil {
-		return fmt.Errorf("failed to create output file: %v", err)
-	}
-	defer output.Close()
-
-	output.Write(result.Code)
-
-	return nil
+	return GenerateComponentTSX(tsx, publicFolder)
 }

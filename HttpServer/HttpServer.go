@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/prigas-dev/backoffice-ai/AiAssistant"
 	"github.com/prigas-dev/backoffice-ai/ComponentGenerator"
@@ -42,7 +43,7 @@ func Start(ctx context.Context, db *sql.DB) {
 
 	http.HandleFunc("/generate-component", func(w http.ResponseWriter, r *http.Request) {
 
-		err := ComponentGenerator.GenerateComponent("./HttpServer/public")
+		err := ComponentGenerator.GenerateComponentSample("./HttpServer/public")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -51,7 +52,6 @@ func Start(ctx context.Context, db *sql.DB) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	//todo
 	http.HandleFunc("/test-anthropic", func(w http.ResponseWriter, r *http.Request) {
 
 		err := r.ParseForm()
@@ -76,7 +76,95 @@ func Start(ctx context.Context, db *sql.DB) {
 		json.NewEncoder(w).Encode(result)
 	})
 
+	http.HandleFunc("/test-load-view", func(w http.ResponseWriter, r *http.Request) {
+		file, err := os.Open("AiGeneratedViews/todo_tasks_list.json")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer file.Close()
+
+		p := &AiAssistant.PageComponentView{}
+		err = json.NewDecoder(file).Decode(p)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		err = ComponentGenerator.GenerateComponentTSX(p.Component.Code, "./HttpServer/public")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		props := map[string]any{}
+
+		for _, query := range p.Queries {
+			rows, err := RunQuery(db, query)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			if query.Mode == AiAssistant.SingleRow {
+				if len(rows) == 1 {
+					props[query.MapToProp] = rows[0]
+				}
+			} else if query.Mode == AiAssistant.MultipleRows {
+				props[query.MapToProp] = rows
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(props)
+	})
+
 	// Start the web server
 	log.Println("Server starting on http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func RunQuery(db *sql.DB, query AiAssistant.Query) ([]map[string]any, error) {
+	rows, err := db.Query(query.SQL)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+
+	scannedRows := []map[string]any{}
+	for rows.Next() {
+		values := make([]any, len(columns))
+		scanArgs := make([]any, len(columns))
+		for i := range values {
+			scanArgs[i] = &values[i]
+		}
+
+		err := rows.Scan(scanArgs...)
+		if err != nil {
+			return nil, err
+		}
+
+		mapValues := map[string]any{}
+		for i, val := range values {
+			// Ensuring byte slices are converted to string
+			if b, ok := val.([]byte); ok {
+				values[i] = string(b)
+			}
+
+			mapValues[columns[i]] = values[i]
+		}
+
+		scannedRows = append(scannedRows, mapValues)
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	return scannedRows, nil
 }
