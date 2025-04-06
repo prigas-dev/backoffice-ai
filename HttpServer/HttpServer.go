@@ -1,18 +1,22 @@
 package HttpServer
 
 import (
+	"context"
+	"database/sql"
 	"embed"
+	"encoding/json"
 	"html/template"
 	"log"
 	"net/http"
 
+	"github.com/prigas-dev/backoffice-ai/AiAssistant"
 	"github.com/prigas-dev/backoffice-ai/ComponentGenerator"
 )
 
 //go:embed index.html
 var templates embed.FS
 
-func Start() {
+func Start(ctx context.Context, db *sql.DB) {
 	// Parse the HTML template
 	tmpl, err := template.ParseFS(templates, "*.html")
 	if err != nil {
@@ -41,9 +45,35 @@ func Start() {
 		err := ComponentGenerator.GenerateComponent("./HttpServer/public")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 
 		w.WriteHeader(http.StatusOK)
+	})
+
+	//todo
+	http.HandleFunc("/test-anthropic", func(w http.ResponseWriter, r *http.Request) {
+
+		err := r.ParseForm()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		prompt := r.Form.Get("prompt")
+		if len(prompt) == 0 {
+			http.Error(w, "prompt is required", http.StatusBadRequest)
+			return
+		}
+
+		result, err := AiAssistant.Assist(ctx, db, prompt)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(result)
 	})
 
 	// Start the web server

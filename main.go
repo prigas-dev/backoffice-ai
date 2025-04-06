@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"os"
@@ -8,11 +9,27 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
+	"github.com/joho/godotenv"
 	"github.com/prigas-dev/backoffice-ai/HttpServer"
 )
 
 func main() {
-	HttpServer.Start()
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	dbPath := "./kanban.db"
+	// Open database connection
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		log.Fatalf("Failed to open database: %v", err)
+	}
+	defer db.Close()
+
+	ctx := context.Background()
+
+	HttpServer.Start(ctx, db)
 }
 
 func main_Pages_Database() {
