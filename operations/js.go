@@ -6,9 +6,10 @@ import (
 	"reflect"
 
 	"github.com/dop251/goja"
+	"github.com/prigas-dev/backoffice-ai/utils"
 )
 
-func ExecuteJavascript[T any](name string, script string) (T, error) {
+func ExecuteJavascript[T any](name string, script string, arguments []any) (T, error) {
 	// TODO cache compiled scripts
 	vm := goja.New()
 	defer vm.Interrupt("halt")
@@ -23,16 +24,27 @@ func ExecuteJavascript[T any](name string, script string) (T, error) {
 	}
 	Error := v.ToObject(vm)
 
-	runResult, err := vm.RunString(script)
+	runScriptResult, err := vm.RunString(script)
 	if err != nil {
 		return zero, err
 	}
-	err, isResultError := unwrapError(vm, Error, runResult)
+	err, isResultError := unwrapError(vm, Error, runScriptResult)
 	if isResultError {
 		return zero, err
 	}
 
-	promise, isPromise := runResult.Export().(*goja.Promise)
+	callFunction, isFunction := goja.AssertFunction(vm.Get("run"))
+	if !isFunction {
+		return zero, fmt.Errorf("javascript %s does not declare a function run()", name)
+	}
+
+	jsArguments := utils.Map(arguments, vm.ToValue)
+	runFunctionResult, err := callFunction(goja.Undefined(), jsArguments...)
+	if err != nil {
+		return zero, err
+	}
+
+	promise, isPromise := runFunctionResult.Export().(*goja.Promise)
 	if isPromise {
 		promiseResult := promise.Result()
 
@@ -58,7 +70,7 @@ func ExecuteJavascript[T any](name string, script string) (T, error) {
 		return result, nil
 	}
 
-	result, err := castJSValue[T](vm, runResult)
+	result, err := castJSValue[T](vm, runFunctionResult)
 	if err != nil {
 		return zero, err
 	}

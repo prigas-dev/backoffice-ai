@@ -50,7 +50,7 @@ func TestGoja(t *testing.T) {
 		vm := goja.New()
 		defer vm.Interrupt("halt")
 
-		v, err := vm.RunString("class NewError extends Error {} (async function() { throw new NewError('banana'); })()")
+		v, err := vm.RunString("class NewError extends Error {} (async function run() { throw new NewError('banana'); })()")
 		assert.NoError(t, err)
 
 		promise := v.Export().(*goja.Promise)
@@ -88,7 +88,10 @@ func TestExecuteJavascript(t *testing.T) {
 			Prigas bool   `json:"prigas"`
 		}
 
-		prigas, err := operations.ExecuteJavascript[Prigas]("", "({ name: 'prigas', prigas: true })")
+		prigas, err := operations.ExecuteJavascript[Prigas]("",
+			`function run() {
+				return { name: 'prigas', prigas: true } 
+			}`, []any{})
 
 		assert.NoError(t, err)
 		assert.Equal(t, Prigas{Name: "prigas", Prigas: true}, prigas)
@@ -97,7 +100,10 @@ func TestExecuteJavascript(t *testing.T) {
 	t.Run("should extract string", func(t *testing.T) {
 		t.Parallel()
 
-		str, err := operations.ExecuteJavascript[string]("", "'prigas'")
+		str, err := operations.ExecuteJavascript[string]("",
+			`function run() {
+				return 'prigas'
+			}`, []any{})
 
 		assert.NoError(t, err)
 		assert.Equal(t, "prigas", str)
@@ -106,7 +112,10 @@ func TestExecuteJavascript(t *testing.T) {
 	t.Run("should extract boolean", func(t *testing.T) {
 		t.Parallel()
 
-		boolean, err := operations.ExecuteJavascript[bool]("", "true")
+		boolean, err := operations.ExecuteJavascript[bool]("",
+			`function run() {
+				return true
+			}`, []any{})
 
 		assert.NoError(t, err)
 		assert.Equal(t, true, boolean)
@@ -115,7 +124,10 @@ func TestExecuteJavascript(t *testing.T) {
 	t.Run("should extract integers", func(t *testing.T) {
 		t.Parallel()
 
-		integer, err := operations.ExecuteJavascript[int32]("", "32")
+		integer, err := operations.ExecuteJavascript[int32]("",
+			`function run() {
+				return 32
+			}`, []any{})
 
 		assert.NoError(t, err)
 		assert.Equal(t, int32(32), integer)
@@ -124,7 +136,10 @@ func TestExecuteJavascript(t *testing.T) {
 	t.Run("should extract floats", func(t *testing.T) {
 		t.Parallel()
 
-		floater, err := operations.ExecuteJavascript[float64]("", "Infinity")
+		floater, err := operations.ExecuteJavascript[float64]("",
+			`function run() {
+				return Infinity
+			}`, []any{})
 
 		assert.NoError(t, err)
 		assert.True(t, math.IsInf(floater, 1))
@@ -133,7 +148,10 @@ func TestExecuteJavascript(t *testing.T) {
 	t.Run("should extract null from null", func(t *testing.T) {
 		t.Parallel()
 
-		nullable, err := operations.ExecuteJavascript[*int]("", "null")
+		nullable, err := operations.ExecuteJavascript[*int]("",
+			`function run() {
+				return null
+			}`, []any{})
 
 		assert.NoError(t, err)
 		assert.Nil(t, nullable)
@@ -142,7 +160,10 @@ func TestExecuteJavascript(t *testing.T) {
 	t.Run("should extract null from undefined", func(t *testing.T) {
 		t.Parallel()
 
-		undefinable, err := operations.ExecuteJavascript[*int]("", "undefined")
+		undefinable, err := operations.ExecuteJavascript[*int]("",
+			`function run() {
+				return undefined
+			}`, []any{})
 
 		assert.NoError(t, err)
 		assert.Nil(t, undefinable)
@@ -151,7 +172,10 @@ func TestExecuteJavascript(t *testing.T) {
 	t.Run("should extract Error", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := operations.ExecuteJavascript[any]("", "new Error('banana')")
+		_, err := operations.ExecuteJavascript[any]("",
+			`function run() {
+				throw new Error('banana')
+			}`, []any{})
 
 		assert.ErrorContains(t, err, "Error: banana")
 	})
@@ -159,7 +183,12 @@ func TestExecuteJavascript(t *testing.T) {
 	t.Run("should resolve Promise", func(t *testing.T) {
 		t.Parallel()
 
-		result, err := operations.ExecuteJavascript[string]("", "new Promise(function(resolve) { resolve('prigas') })")
+		result, err := operations.ExecuteJavascript[string]("",
+			`function run() {
+				return new Promise((resolve) => {
+					resolve('prigas')
+				})
+			}`, []any{})
 
 		assert.NoError(t, err)
 		assert.Equal(t, "prigas", result)
@@ -168,7 +197,12 @@ func TestExecuteJavascript(t *testing.T) {
 	t.Run("should reject Promise", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := operations.ExecuteJavascript[any]("", "new Promise(function(_, reject) { reject(new Error('my error')) })")
+		_, err := operations.ExecuteJavascript[any]("",
+			`function run() {
+				return new Promise((_, reject) => {
+					reject(new Error('my error'))
+				})
+			}`, []any{})
 
 		assert.ErrorContains(t, err, "my error")
 	})
@@ -176,7 +210,12 @@ func TestExecuteJavascript(t *testing.T) {
 	t.Run("should reject non error values", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := operations.ExecuteJavascript[any]("", "new Promise(function(_, reject) { reject('non error') })")
+		_, err := operations.ExecuteJavascript[any]("",
+			`function run() {
+				return new Promise((_, reject) => {
+					reject('non error')
+				})
+			}`, []any{})
 
 		assert.ErrorContains(t, err, "non error")
 	})
