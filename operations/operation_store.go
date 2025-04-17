@@ -13,7 +13,9 @@ type InMemoryOperationStore struct {
 }
 
 func NewInMemoryOperationStore() *InMemoryOperationStore {
-	return &InMemoryOperationStore{}
+	return &InMemoryOperationStore{
+		operations: map[string]*Operation{},
+	}
 }
 
 func (s *InMemoryOperationStore) GetOperation(operationName string) (*Operation, error) {

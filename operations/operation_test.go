@@ -103,16 +103,22 @@ func TestValueSchema(t *testing.T) {
 				expectedValidationResult: operations.ValidationResult{Success: false, Message: "value is not a string"},
 			},
 			{
-				desc:                     "valid number",
+				desc:                     "valid number: float64",
 				spec:                     &operations.NumberSpec{},
 				value:                    12.5,
+				expectedValidationResult: operations.ValidationResult{Success: true},
+			},
+			{
+				desc:                     "valid number: int64",
+				spec:                     &operations.NumberSpec{},
+				value:                    int64(12),
 				expectedValidationResult: operations.ValidationResult{Success: true},
 			},
 			{
 				desc:                     "invalid number",
 				spec:                     &operations.NumberSpec{},
 				value:                    "",
-				expectedValidationResult: operations.ValidationResult{Success: false, Message: "value is not a float64"},
+				expectedValidationResult: operations.ValidationResult{Success: false, Message: "value is not a float64 or int64"},
 			},
 			{
 				desc:                     "valid boolean",
@@ -202,7 +208,7 @@ func TestValueSchema(t *testing.T) {
 					},
 				},
 				value:                    []any{12.0, "not a number"},
-				expectedValidationResult: operations.ValidationResult{Success: false, Message: "invalid item 1: value is not a float64"},
+				expectedValidationResult: operations.ValidationResult{Success: false, Message: "invalid item 1: value is not a float64 or int64"},
 			},
 		}
 		for _, tC := range testCases {

@@ -33,8 +33,8 @@ type Spec interface {
 }
 
 type ValidationResult struct {
-	Success bool
-	Message string
+	Success bool   `json:"success"`
+	Message string `json:"message"`
 }
 
 type StringSpec struct{}
@@ -53,7 +53,10 @@ type NumberSpec struct{}
 func (p *NumberSpec) Validate(value any) ValidationResult {
 	_, isFloat := value.(float64)
 	if !isFloat {
-		return ValidationResult{Success: false, Message: "value is not a float64"}
+		_, isInt := value.(int64)
+		if !isInt {
+			return ValidationResult{Success: false, Message: "value is not a float64 or int64"}
+		}
 	}
 	return ValidationResult{Success: true}
 }
@@ -69,7 +72,7 @@ func (p *BooleanSpec) Validate(value any) ValidationResult {
 }
 
 type ObjectSpec struct {
-	Properties map[string]*ValueSchema
+	Properties map[string]*ValueSchema `json:"properties"`
 }
 
 func (p *ObjectSpec) Validate(value any) ValidationResult {
@@ -93,7 +96,7 @@ func (p *ObjectSpec) Validate(value any) ValidationResult {
 }
 
 type ArraySpec struct {
-	Items *ValueSchema
+	Items *ValueSchema `json:"items"`
 }
 
 func (p *ArraySpec) Validate(value any) ValidationResult {
