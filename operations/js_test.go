@@ -91,7 +91,7 @@ func TestExecuteJavascript(t *testing.T) {
 		prigas, err := operations.ExecuteJavascript[Prigas]("",
 			`function run() {
 				return { name: 'prigas', prigas: true } 
-			}`, []any{})
+			}`, map[string]any{})
 
 		assert.NoError(t, err)
 		assert.Equal(t, Prigas{Name: "prigas", Prigas: true}, prigas)
@@ -103,7 +103,7 @@ func TestExecuteJavascript(t *testing.T) {
 		str, err := operations.ExecuteJavascript[string]("",
 			`function run() {
 				return 'prigas'
-			}`, []any{})
+			}`, map[string]any{})
 
 		assert.NoError(t, err)
 		assert.Equal(t, "prigas", str)
@@ -115,7 +115,7 @@ func TestExecuteJavascript(t *testing.T) {
 		boolean, err := operations.ExecuteJavascript[bool]("",
 			`function run() {
 				return true
-			}`, []any{})
+			}`, map[string]any{})
 
 		assert.NoError(t, err)
 		assert.Equal(t, true, boolean)
@@ -127,7 +127,7 @@ func TestExecuteJavascript(t *testing.T) {
 		integer, err := operations.ExecuteJavascript[int32]("",
 			`function run() {
 				return 32
-			}`, []any{})
+			}`, map[string]any{})
 
 		assert.NoError(t, err)
 		assert.Equal(t, int32(32), integer)
@@ -139,7 +139,7 @@ func TestExecuteJavascript(t *testing.T) {
 		floater, err := operations.ExecuteJavascript[float64]("",
 			`function run() {
 				return Infinity
-			}`, []any{})
+			}`, map[string]any{})
 
 		assert.NoError(t, err)
 		assert.True(t, math.IsInf(floater, 1))
@@ -151,7 +151,7 @@ func TestExecuteJavascript(t *testing.T) {
 		nullable, err := operations.ExecuteJavascript[*int]("",
 			`function run() {
 				return null
-			}`, []any{})
+			}`, map[string]any{})
 
 		assert.NoError(t, err)
 		assert.Nil(t, nullable)
@@ -163,7 +163,7 @@ func TestExecuteJavascript(t *testing.T) {
 		undefinable, err := operations.ExecuteJavascript[*int]("",
 			`function run() {
 				return undefined
-			}`, []any{})
+			}`, map[string]any{})
 
 		assert.NoError(t, err)
 		assert.Nil(t, undefinable)
@@ -175,7 +175,7 @@ func TestExecuteJavascript(t *testing.T) {
 		_, err := operations.ExecuteJavascript[any]("",
 			`function run() {
 				throw new Error('banana')
-			}`, []any{})
+			}`, map[string]any{})
 
 		assert.ErrorContains(t, err, "Error: banana")
 	})
@@ -188,7 +188,7 @@ func TestExecuteJavascript(t *testing.T) {
 				return new Promise((resolve) => {
 					resolve('prigas')
 				})
-			}`, []any{})
+			}`, map[string]any{})
 
 		assert.NoError(t, err)
 		assert.Equal(t, "prigas", result)
@@ -202,7 +202,7 @@ func TestExecuteJavascript(t *testing.T) {
 				return new Promise((_, reject) => {
 					reject(new Error('my error'))
 				})
-			}`, []any{})
+			}`, map[string]any{})
 
 		assert.ErrorContains(t, err, "my error")
 	})
@@ -215,7 +215,7 @@ func TestExecuteJavascript(t *testing.T) {
 				return new Promise((_, reject) => {
 					reject('non error')
 				})
-			}`, []any{})
+			}`, map[string]any{})
 
 		assert.ErrorContains(t, err, "non error")
 	})

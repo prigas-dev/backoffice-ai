@@ -6,10 +6,9 @@ import (
 	"reflect"
 
 	"github.com/dop251/goja"
-	"github.com/prigas-dev/backoffice-ai/utils"
 )
 
-func ExecuteJavascript[T any](name string, script string, arguments []any) (T, error) {
+func ExecuteJavascript[T any](name string, script string, arguments map[string]any) (T, error) {
 	// TODO cache compiled scripts
 	vm := goja.New()
 	defer vm.Interrupt("halt")
@@ -38,8 +37,8 @@ func ExecuteJavascript[T any](name string, script string, arguments []any) (T, e
 		return zero, fmt.Errorf("javascript %s does not declare a function run()", name)
 	}
 
-	jsArguments := utils.Map(arguments, vm.ToValue)
-	runFunctionResult, err := callFunction(goja.Undefined(), jsArguments...)
+	jsArguments := vm.ToValue(arguments)
+	runFunctionResult, err := callFunction(goja.Undefined(), jsArguments)
 	if err != nil {
 		return zero, err
 	}

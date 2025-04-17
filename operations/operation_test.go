@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestOperation(t *testing.T) {
+func TestValueSchema(t *testing.T) {
 	t.Parallel()
 
-	t.Run("value schema json serialization", func(t *testing.T) {
+	t.Run("json serialization", func(t *testing.T) {
 		t.Parallel()
 
 		testCases := []struct {
@@ -21,33 +21,33 @@ func TestOperation(t *testing.T) {
 			{
 				desc: "string",
 				valueSchema: &operations.ValueSchema{
-					Type:           operations.String,
-					TypeProperties: &operations.StringProperties{},
+					Type: operations.String,
+					Spec: &operations.StringSpec{},
 				},
 			},
 			{
 				desc: "integer",
 				valueSchema: &operations.ValueSchema{
-					Type:           operations.Number,
-					TypeProperties: &operations.NumberProperties{},
+					Type: operations.Number,
+					Spec: &operations.NumberSpec{},
 				},
 			},
 			{
 				desc: "boolean",
 				valueSchema: &operations.ValueSchema{
-					Type:           operations.Boolean,
-					TypeProperties: &operations.BooleanProperties{},
+					Type: operations.Boolean,
+					Spec: &operations.BooleanSpec{},
 				},
 			},
 			{
 				desc: "object",
 				valueSchema: &operations.ValueSchema{
 					Type: operations.Object,
-					TypeProperties: &operations.ObjectProperties{
+					Spec: &operations.ObjectSpec{
 						Properties: map[string]*operations.ValueSchema{
 							"prop": {
-								Type:           operations.Boolean,
-								TypeProperties: &operations.BooleanProperties{},
+								Type: operations.Boolean,
+								Spec: &operations.BooleanSpec{},
 							},
 						},
 					},
@@ -57,10 +57,10 @@ func TestOperation(t *testing.T) {
 				desc: "array",
 				valueSchema: &operations.ValueSchema{
 					Type: operations.Array,
-					TypeProperties: &operations.ArrayProperties{
+					Spec: &operations.ArraySpec{
 						Items: &operations.ValueSchema{
-							Type:           operations.Boolean,
-							TypeProperties: &operations.BooleanProperties{},
+							Type: operations.Boolean,
+							Spec: &operations.BooleanSpec{},
 						},
 					},
 				},
@@ -79,6 +79,139 @@ func TestOperation(t *testing.T) {
 
 				assert.Equal(t, tC.valueSchema, &decoded)
 
+			})
+		}
+	})
+
+	t.Run("validations", func(t *testing.T) {
+		testCases := []struct {
+			desc                     string
+			spec                     operations.Spec
+			value                    any
+			expectedValidationResult operations.ValidationResult
+		}{
+			{
+				desc:                     "valid string",
+				spec:                     &operations.StringSpec{},
+				value:                    "prigas",
+				expectedValidationResult: operations.ValidationResult{Success: true},
+			},
+			{
+				desc:                     "invalid string",
+				spec:                     &operations.StringSpec{},
+				value:                    12,
+				expectedValidationResult: operations.ValidationResult{Success: false, Message: "value is not a string"},
+			},
+			{
+				desc:                     "valid number",
+				spec:                     &operations.NumberSpec{},
+				value:                    12.5,
+				expectedValidationResult: operations.ValidationResult{Success: true},
+			},
+			{
+				desc:                     "invalid number",
+				spec:                     &operations.NumberSpec{},
+				value:                    "",
+				expectedValidationResult: operations.ValidationResult{Success: false, Message: "value is not a float64"},
+			},
+			{
+				desc:                     "valid boolean",
+				spec:                     &operations.BooleanSpec{},
+				value:                    false,
+				expectedValidationResult: operations.ValidationResult{Success: true},
+			},
+			{
+				desc:                     "invalid boolean",
+				spec:                     &operations.BooleanSpec{},
+				value:                    "",
+				expectedValidationResult: operations.ValidationResult{Success: false, Message: "value is not a bool"},
+			},
+			{
+				desc: "valid object",
+				spec: &operations.ObjectSpec{
+					Properties: map[string]*operations.ValueSchema{
+						"strProp": {
+							Type: operations.String,
+							Spec: &operations.StringSpec{},
+						},
+						"boolProp": {
+							Type: operations.Boolean,
+							Spec: &operations.BooleanSpec{},
+						},
+					},
+				},
+				value: map[string]any{
+					"strProp":  "prigas",
+					"boolProp": false,
+				},
+				expectedValidationResult: operations.ValidationResult{Success: true},
+			},
+			{
+				desc: "invalid object: not a map",
+				spec: &operations.ObjectSpec{
+					Properties: map[string]*operations.ValueSchema{},
+				},
+				value:                    "",
+				expectedValidationResult: operations.ValidationResult{Success: false, Message: "value is not a map"},
+			},
+			{
+				desc: "invalid object: missing property",
+				spec: &operations.ObjectSpec{
+					Properties: map[string]*operations.ValueSchema{
+						"prigas": {
+							Type: operations.Boolean,
+							Spec: &operations.BooleanSpec{},
+						},
+					},
+				},
+				value:                    map[string]any{},
+				expectedValidationResult: operations.ValidationResult{Success: false, Message: "missing property prigas"},
+			},
+			{
+				desc: "invalid object: invalid property",
+				spec: &operations.ObjectSpec{
+					Properties: map[string]*operations.ValueSchema{
+						"prigas": {
+							Type: operations.Boolean,
+							Spec: &operations.BooleanSpec{},
+						},
+					},
+				},
+				value: map[string]any{
+					"prigas": "non bool",
+				},
+				expectedValidationResult: operations.ValidationResult{Success: false, Message: "invalid propery prigas: value is not a bool"},
+			},
+			{
+				desc: "valid array",
+				spec: &operations.ArraySpec{
+					Items: &operations.ValueSchema{
+						Type: operations.Number,
+						Spec: &operations.NumberSpec{},
+					},
+				},
+				value:                    []any{12.0},
+				expectedValidationResult: operations.ValidationResult{Success: true},
+			},
+			{
+				desc: "invalid array: invalid item",
+				spec: &operations.ArraySpec{
+					Items: &operations.ValueSchema{
+						Type: operations.Number,
+						Spec: &operations.NumberSpec{},
+					},
+				},
+				value:                    []any{12.0, "not a number"},
+				expectedValidationResult: operations.ValidationResult{Success: false, Message: "invalid item 1: value is not a float64"},
+			},
+		}
+		for _, tC := range testCases {
+			t.Run(tC.desc, func(t *testing.T) {
+				t.Parallel()
+
+				actualValidationResult := tC.spec.Validate(tC.value)
+
+				assert.Equal(t, tC.expectedValidationResult, actualValidationResult)
 			})
 		}
 	})

@@ -6,17 +6,16 @@ import (
 )
 
 type Operation struct {
-	Name           string         `json:"name"`
-	JavascriptCode string         `json:"javascriptCode"`
-	Parameters     []*ValueSchema `json:"parameters"`
+	Name           string                  `json:"name"`
+	JavascriptCode string                  `json:"javascriptCode"`
+	Parameters     map[string]*ValueSchema `json:"parameters"`
 	Return         *ValueSchema
 }
 
 type ValueSchema struct {
-	Name              string          `json:"name"`
-	Type              Type            `json:"type"`
-	TypeProperties    TypeProperties  `json:"-"`
-	TypePropertiesRaw json.RawMessage `json:"typeProperties"`
+	Type    Type            `json:"type"`
+	Spec    Spec            `json:"-"`
+	SpecRaw json.RawMessage `json:"spec"`
 }
 
 type Type string
@@ -29,7 +28,7 @@ const (
 	Array   Type = "array"
 )
 
-type TypeProperties interface {
+type Spec interface {
 	Validate(value any) ValidationResult
 }
 
@@ -38,9 +37,9 @@ type ValidationResult struct {
 	Message string
 }
 
-type StringProperties struct{}
+type StringSpec struct{}
 
-func (p *StringProperties) Validate(value any) ValidationResult {
+func (p *StringSpec) Validate(value any) ValidationResult {
 	_, isString := value.(string)
 	if isString {
 		return ValidationResult{Success: true}
@@ -49,9 +48,9 @@ func (p *StringProperties) Validate(value any) ValidationResult {
 	return ValidationResult{Success: false, Message: "value is not a string"}
 }
 
-type NumberProperties struct{}
+type NumberSpec struct{}
 
-func (p *NumberProperties) Validate(value any) ValidationResult {
+func (p *NumberSpec) Validate(value any) ValidationResult {
 	_, isFloat := value.(float64)
 	if !isFloat {
 		return ValidationResult{Success: false, Message: "value is not a float64"}
@@ -59,9 +58,9 @@ func (p *NumberProperties) Validate(value any) ValidationResult {
 	return ValidationResult{Success: true}
 }
 
-type BooleanProperties struct{}
+type BooleanSpec struct{}
 
-func (p *BooleanProperties) Validate(value any) ValidationResult {
+func (p *BooleanSpec) Validate(value any) ValidationResult {
 	_, isBool := value.(bool)
 	if !isBool {
 		return ValidationResult{Success: false, Message: "value is not a bool"}
@@ -69,41 +68,41 @@ func (p *BooleanProperties) Validate(value any) ValidationResult {
 	return ValidationResult{Success: true}
 }
 
-type ObjectProperties struct {
+type ObjectSpec struct {
 	Properties map[string]*ValueSchema
 }
 
-func (p *ObjectProperties) Validate(value any) ValidationResult {
+func (p *ObjectSpec) Validate(value any) ValidationResult {
 	object, isMap := value.(map[string]any)
 	if !isMap {
 		return ValidationResult{Success: false, Message: "value is not a map"}
 	}
-	for _, objectProperty := range p.Properties {
-		propertyValue, hasProperty := object[objectProperty.Name]
+	for propertyName, property := range p.Properties {
+		propertyValue, hasProperty := object[propertyName]
 		if !hasProperty {
-			return ValidationResult{Success: false, Message: fmt.Sprintf("missing property %s", objectProperty.Name)}
+			return ValidationResult{Success: false, Message: fmt.Sprintf("missing property %s", propertyName)}
 		}
 
-		properyValidationResult := objectProperty.TypeProperties.Validate(propertyValue)
+		properyValidationResult := property.Spec.Validate(propertyValue)
 		if !properyValidationResult.Success {
-			return ValidationResult{Success: false, Message: fmt.Sprintf("invalid propery %s: %s", objectProperty.Name, properyValidationResult.Message)}
+			return ValidationResult{Success: false, Message: fmt.Sprintf("invalid propery %s: %s", propertyName, properyValidationResult.Message)}
 		}
 	}
 
 	return ValidationResult{Success: true}
 }
 
-type ArrayProperties struct {
+type ArraySpec struct {
 	Items *ValueSchema
 }
 
-func (p *ArrayProperties) Validate(value any) ValidationResult {
+func (p *ArraySpec) Validate(value any) ValidationResult {
 	array, isSlice := value.([]any)
 	if !isSlice {
 		return ValidationResult{Success: false, Message: "value is not a slice"}
 	}
 	for index, item := range array {
-		itemValidationResult := p.Items.TypeProperties.Validate(item)
+		itemValidationResult := p.Items.Spec.Validate(item)
 		if !itemValidationResult.Success {
 			return ValidationResult{Success: false, Message: fmt.Sprintf("invalid item %d: %s", index, itemValidationResult.Message)}
 		}
@@ -115,11 +114,11 @@ func (p *ArrayProperties) Validate(value any) ValidationResult {
 type _valueSchema ValueSchema
 
 func (s *ValueSchema) MarshalJSON() ([]byte, error) {
-	typePropertiesRaw, err := json.Marshal(s.TypeProperties)
+	typePropertiesRaw, err := json.Marshal(s.Spec)
 	if err != nil {
 		return nil, err
 	}
-	s.TypePropertiesRaw = typePropertiesRaw
+	s.SpecRaw = typePropertiesRaw
 
 	return json.Marshal((*_valueSchema)(s))
 }
@@ -132,40 +131,40 @@ func (s *ValueSchema) UnmarshalJSON(data []byte) error {
 
 	switch s.Type {
 	case String:
-		stringProperties := &StringProperties{}
-		err := json.Unmarshal(s.TypePropertiesRaw, stringProperties)
+		spec := &StringSpec{}
+		err := json.Unmarshal(s.SpecRaw, spec)
 		if err != nil {
 			return err
 		}
-		s.TypeProperties = stringProperties
+		s.Spec = spec
 	case Number:
-		numberProperties := &NumberProperties{}
-		err := json.Unmarshal(s.TypePropertiesRaw, numberProperties)
+		spec := &NumberSpec{}
+		err := json.Unmarshal(s.SpecRaw, spec)
 		if err != nil {
 			return err
 		}
-		s.TypeProperties = numberProperties
+		s.Spec = spec
 	case Boolean:
-		booleanProperties := &BooleanProperties{}
-		err := json.Unmarshal(s.TypePropertiesRaw, booleanProperties)
+		spec := &BooleanSpec{}
+		err := json.Unmarshal(s.SpecRaw, spec)
 		if err != nil {
 			return err
 		}
-		s.TypeProperties = booleanProperties
+		s.Spec = spec
 	case Object:
-		objectProperties := &ObjectProperties{}
-		err := json.Unmarshal(s.TypePropertiesRaw, objectProperties)
+		spec := &ObjectSpec{}
+		err := json.Unmarshal(s.SpecRaw, spec)
 		if err != nil {
 			return err
 		}
-		s.TypeProperties = objectProperties
+		s.Spec = spec
 	case Array:
-		arrayProperties := &ArrayProperties{}
-		err := json.Unmarshal(s.TypePropertiesRaw, arrayProperties)
+		spec := &ArraySpec{}
+		err := json.Unmarshal(s.SpecRaw, spec)
 		if err != nil {
 			return err
 		}
-		s.TypeProperties = arrayProperties
+		s.Spec = spec
 	}
 
 	return nil

@@ -12,7 +12,7 @@ func TestOperationExecutor(t *testing.T) {
 	store := operations.NewInMemoryOperationStore()
 	store.AddOperation(&operations.Operation{
 		Name:       "single_value",
-		Parameters: []*operations.ValueSchema{},
+		Parameters: map[string]*operations.ValueSchema{},
 		JavascriptCode: `function () {
 			return 1
 		}`,

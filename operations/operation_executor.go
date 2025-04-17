@@ -2,8 +2,6 @@ package operations
 
 import (
 	"fmt"
-
-	"github.com/prigas-dev/backoffice-ai/utils"
 )
 
 type IOperationExecutor interface {
@@ -25,29 +23,25 @@ func (o *OperationExecutor) Execute(operationName string, arguments map[string]a
 	if err != nil {
 		return nil, err
 	}
-	for _, parameter := range operation.Parameters {
-		value, hasValue := arguments[parameter.Name]
+	for parameterName, parameter := range operation.Parameters {
+		value, hasValue := arguments[parameterName]
 		if !hasValue {
-			return nil, fmt.Errorf("argument not provided: %s", parameter.Name)
+			return nil, fmt.Errorf("argument not provided: %s", parameterName)
 		}
-		validationResult := parameter.TypeProperties.Validate(value)
+		validationResult := parameter.Spec.Validate(value)
 		if !validationResult.Success {
-			return nil, fmt.Errorf("invalid argument %s: %s", parameter.Name, validationResult.Message)
+			return nil, fmt.Errorf("invalid argument %s: %s", parameterName, validationResult.Message)
 		}
 	}
 
-	argumentsList := utils.Map(operation.Parameters,
-		func(parameter *ValueSchema) any {
-			value, ok := arguments[parameter.Name]
-			if !ok {
-				return nil
-			}
-			return value
-		})
-
-	result, err := ExecuteJavascript[any](operationName, operation.JavascriptCode, argumentsList)
+	result, err := ExecuteJavascript[any](operationName, operation.JavascriptCode, arguments)
 	if err != nil {
 		return nil, err
+	}
+
+	resultValidationResult := operation.Return.Spec.Validate(result)
+	if !resultValidationResult.Success {
+		return nil, fmt.Errorf("invalid result: %s", resultValidationResult.Message)
 	}
 
 	return result, nil
