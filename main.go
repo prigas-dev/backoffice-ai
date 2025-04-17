@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/joho/godotenv"
-	"github.com/prigas-dev/backoffice-ai/HttpServer"
+	"github.com/prigas-dev/backoffice-ai/http_server"
 )
 
 func main() {
@@ -29,7 +29,7 @@ func main() {
 
 	ctx := context.Background()
 
-	HttpServer.Start(ctx, db)
+	http_server.Start(ctx, db)
 }
 
 func main_Pages_Database() {

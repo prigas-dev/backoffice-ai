@@ -30,7 +30,7 @@ These are all possible values for a task status:
 		return nil, fmt.Errorf("failed to save view json file: %w", err)
 	}
 
-	err = ComponentGenerator.GenerateComponentTSX(p.Component.Code, "./HttpServer/public")
+	err = ComponentGenerator.GenerateComponentTSX(p.Component.Code, "./http_server/public")
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate tsx component: %w", err)
 	}
