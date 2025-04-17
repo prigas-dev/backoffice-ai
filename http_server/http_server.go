@@ -130,7 +130,7 @@ func Start(ctx context.Context, db *sql.DB) {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(ExecuteOperationErrorResponseBody{
 				Success: false,
-				Message: "error on operation execution",
+				Message: fmt.Sprintf("error on operation execution: %v", err),
 			})
 			return
 		}

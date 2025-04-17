@@ -1,0 +1,170 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["name", "javascriptCode", "parameters", "return"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string",
+      "description": "Name of the operation slug-case. It's a unique identifier for the operation and should be short and descriptive about what the operation is doing and its parameters",
+      "minLength": 1,
+      "examples": ["update-user", "get-user-by-id", "send-email"]
+    },
+    "javascriptCode": {
+      "type": "string",
+      "description": "The javascript code that will execute the operation. It must declare a top level function called 'run'. The first argument will be an object with properties as declared on the operation parameters schema. The returned value must have the same type and structure as declared on the operation return schema",
+      "minLength": 1,
+      "examples": [
+        "// simple function\nfunction run() {\n  return 'hello'\n}",
+        "// declaring other functions and variables is fine\nconst maxAttempts = 5\nfunction run() {\n  let attempts = 1\n  while (attempts <= maxAttempts) {\n    const randomNumber = getRandomNumber()\n    if (randomNumber > 0.5) {\n      return randomNumber\n    }\n  }\n  throw new Error('unable to generate a valid random number')\n}\n\nfunction getRandomNumber() {\n  return Math.random()\n}",
+        "// using arguments\nfunction run({ str }) {\n  return { length: str.length }\n}"
+      ]
+    },
+    "parameters": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/ValueSchema"
+      },
+      "description": "Parameters schema of the operation. This defines the shape of the object that will be passed as argument to the run function.",
+      "examples": [
+        {
+          "userId": {
+            "type": "string",
+            "spec": {}
+          },
+          "userInfo": {
+            "type": "object",
+            "spec": {
+              "properties": {
+                "fullName": {
+                  "type": "string",
+                  "spec": {}
+                },
+                "address": {
+                  "type": "string",
+                  "spec": {}
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "return": {
+      "$ref": "#/definitions/ValueSchema",
+      "description": "Return schema of the operation. This defines the shape of the value returned by the run function.",
+      "examples": [
+        {
+          "type": "array",
+          "spec": {
+            "items": {
+              "type": "string",
+              "spec": {}
+            }
+          }
+        }
+      ]
+    }
+  },
+  "definitions": {
+    "ArraySchema": {
+      "required": ["type", "spec"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["array"]
+        },
+        "spec": {
+          "type": "object",
+          "required": ["items"],
+          "additionalProperties": false,
+          "properties": {
+            "items": { "$ref": "#/definitions/ValueSchema" }
+          }
+        }
+      }
+    },
+    "BooleanSchema": {
+      "required": ["type", "spec"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["boolean"]
+        },
+        "spec": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    "NumberSchema": {
+      "required": ["type", "spec"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["number"]
+        },
+        "spec": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    "ObjectSchema": {
+      "required": ["type", "spec"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["object"]
+        },
+        "spec": {
+          "type": "object",
+          "required": ["properties"],
+          "additionalProperties": false,
+          "properties": {
+            "properties": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/ValueSchema"
+              }
+            }
+          }
+        }
+      }
+    },
+    "StringSchema": {
+      "required": ["type", "spec"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["string"]
+        },
+        "spec": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    "ValueSchema": {
+      "type": "object",
+      "oneOf": [
+        { "$ref": "#/definitions/ArraySchema" },
+        { "$ref": "#/definitions/BooleanSchema" },
+        { "$ref": "#/definitions/NumberSchema" },
+        { "$ref": "#/definitions/ObjectSchema" },
+        { "$ref": "#/definitions/StringSchema" }
+      ]
+    }
+  }
+}

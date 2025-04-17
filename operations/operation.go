@@ -9,7 +9,7 @@ type Operation struct {
 	Name           string                  `json:"name"`
 	JavascriptCode string                  `json:"javascriptCode"`
 	Parameters     map[string]*ValueSchema `json:"parameters"`
-	Return         *ValueSchema
+	Return         *ValueSchema            `json:"return"`
 }
 
 type ValueSchema struct {
