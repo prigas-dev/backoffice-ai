@@ -20,7 +20,10 @@ These are all possible values for a task status:
 - todo
 - in_progress
 `
-	p, err := AiAssistant.Assist(ctx, db, prompt, databaseHints)
+	templateData := AiAssistant.InstructionsTemplateData{
+		DatabaseHints: databaseHints,
+	}
+	p, err := AiAssistant.Assist(ctx, db, prompt, templateData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create page component view: %w", err)
 	}

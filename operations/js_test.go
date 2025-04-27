@@ -75,6 +75,19 @@ func TestGoja(t *testing.T) {
 		assert.Equal(t, message, "banana")
 		assert.NotEmpty(t, stack)
 	})
+
+	t.Run("template strings", func(t *testing.T) {
+		t.Parallel()
+
+		vm := goja.New()
+		defer vm.Interrupt("halt")
+
+		v, err := vm.RunString("`asdfads ${123} asdfasdf`")
+		assert.NoError(t, err)
+
+		assert.Equal(t, "asdfads 123 asdfasdf", v.Export())
+
+	})
 }
 
 func TestExecuteJavascript(t *testing.T) {
@@ -91,7 +104,7 @@ func TestExecuteJavascript(t *testing.T) {
 		prigas, err := operations.ExecuteJavascript[Prigas]("",
 			`function run() {
 				return { name: 'prigas', prigas: true } 
-			}`, map[string]any{})
+			}`, map[string]any{}, map[string]any{})
 
 		assert.NoError(t, err)
 		assert.Equal(t, Prigas{Name: "prigas", Prigas: true}, prigas)
@@ -103,7 +116,7 @@ func TestExecuteJavascript(t *testing.T) {
 		str, err := operations.ExecuteJavascript[string]("",
 			`function run() {
 				return 'prigas'
-			}`, map[string]any{})
+			}`, map[string]any{}, map[string]any{})
 
 		assert.NoError(t, err)
 		assert.Equal(t, "prigas", str)
@@ -115,7 +128,7 @@ func TestExecuteJavascript(t *testing.T) {
 		boolean, err := operations.ExecuteJavascript[bool]("",
 			`function run() {
 				return true
-			}`, map[string]any{})
+			}`, map[string]any{}, map[string]any{})
 
 		assert.NoError(t, err)
 		assert.Equal(t, true, boolean)
@@ -127,7 +140,7 @@ func TestExecuteJavascript(t *testing.T) {
 		integer, err := operations.ExecuteJavascript[int32]("",
 			`function run() {
 				return 32
-			}`, map[string]any{})
+			}`, map[string]any{}, map[string]any{})
 
 		assert.NoError(t, err)
 		assert.Equal(t, int32(32), integer)
@@ -139,7 +152,7 @@ func TestExecuteJavascript(t *testing.T) {
 		floater, err := operations.ExecuteJavascript[float64]("",
 			`function run() {
 				return Infinity
-			}`, map[string]any{})
+			}`, map[string]any{}, map[string]any{})
 
 		assert.NoError(t, err)
 		assert.True(t, math.IsInf(floater, 1))
@@ -151,7 +164,7 @@ func TestExecuteJavascript(t *testing.T) {
 		nullable, err := operations.ExecuteJavascript[*int]("",
 			`function run() {
 				return null
-			}`, map[string]any{})
+			}`, map[string]any{}, map[string]any{})
 
 		assert.NoError(t, err)
 		assert.Nil(t, nullable)
@@ -163,7 +176,7 @@ func TestExecuteJavascript(t *testing.T) {
 		undefinable, err := operations.ExecuteJavascript[*int]("",
 			`function run() {
 				return undefined
-			}`, map[string]any{})
+			}`, map[string]any{}, map[string]any{})
 
 		assert.NoError(t, err)
 		assert.Nil(t, undefinable)
@@ -175,7 +188,7 @@ func TestExecuteJavascript(t *testing.T) {
 		_, err := operations.ExecuteJavascript[any]("",
 			`function run() {
 				throw new Error('banana')
-			}`, map[string]any{})
+			}`, map[string]any{}, map[string]any{})
 
 		assert.ErrorContains(t, err, "Error: banana")
 	})
@@ -188,7 +201,7 @@ func TestExecuteJavascript(t *testing.T) {
 				return new Promise((resolve) => {
 					resolve('prigas')
 				})
-			}`, map[string]any{})
+			}`, map[string]any{}, map[string]any{})
 
 		assert.NoError(t, err)
 		assert.Equal(t, "prigas", result)
@@ -202,7 +215,7 @@ func TestExecuteJavascript(t *testing.T) {
 				return new Promise((_, reject) => {
 					reject(new Error('my error'))
 				})
-			}`, map[string]any{})
+			}`, map[string]any{}, map[string]any{})
 
 		assert.ErrorContains(t, err, "my error")
 	})
@@ -215,8 +228,26 @@ func TestExecuteJavascript(t *testing.T) {
 				return new Promise((_, reject) => {
 					reject('non error')
 				})
-			}`, map[string]any{})
+			}`, map[string]any{}, map[string]any{})
 
 		assert.ErrorContains(t, err, "non error")
+	})
+
+	t.Run("should run global function", func(t *testing.T) {
+		t.Parallel()
+
+		globals := map[string]any{
+			"banana": func(value string) string {
+				return "a" + value
+			},
+		}
+
+		value, err := operations.ExecuteJavascript[any]("",
+			`function run() {
+				return banana('b')
+			}`, map[string]any{}, globals)
+		assert.NoError(t, err)
+
+		assert.Equal(t, "ab", value)
 	})
 }

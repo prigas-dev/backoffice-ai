@@ -22,13 +22,15 @@
           "react-bootstrap": "https://esm.sh/react-bootstrap@2",
           "react-bootstrap/": "https://esm.sh/react-bootstrap@2/",
           "react-hook-form": "https://esm.sh/react-hook-form@7",
-          "react-hook-form/": "https://esm.sh/react-hook-form@7/"
+          "react-hook-form/": "https://esm.sh/react-hook-form@7/",
+          "@tanstack/react-query": "https://esm.sh/@tanstack/react-query@5",
+          "@tanstack/react-query/": "https://esm.sh/@tanstack/react-query@5/"
         }
       }
     </script>
   </head>
   <body>
-    <div class="container">
+    <div class="container d-none">
       <div class="row">
         <div class="col">
           <form id="create-view-form" autocomplete="off">
@@ -62,6 +64,7 @@
       import Container from "react-bootstrap/Container";
       import Row from "react-bootstrap/Row";
       import Col from "react-bootstrap/Col";
+      import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
 
       const root = createRoot(document.getElementById("root"));
 
@@ -141,11 +144,28 @@
         );
       }
 
-      reactComponentWaiting();
+      // reactComponentWaiting();
+
+      updateReactComponent({});
 
       async function updateReactComponent(props) {
         const mod = await import(`./public/component.mjs?t=${Date.now()}`);
-        root.render(h(mod.Component, props));
+        const queryClient = new QueryClient({
+          defaultOptions: {
+            queries: {
+              retry: false,
+            },
+            mutations: {
+              retry: false,
+            },
+          },
+        });
+        root.render(
+          h(QueryClientProvider, {
+            client: queryClient,
+            children: h(mod.Component, props),
+          })
+        );
       }
     </script>
   </body>

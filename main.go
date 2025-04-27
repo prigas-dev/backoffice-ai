@@ -6,11 +6,10 @@ import (
 	"log"
 	"os"
 
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
-
 	"github.com/joho/godotenv"
 	"github.com/prigas-dev/backoffice-ai/http_server"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func main() {

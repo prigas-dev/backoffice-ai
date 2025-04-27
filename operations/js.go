@@ -8,12 +8,16 @@ import (
 	"github.com/dop251/goja"
 )
 
-func ExecuteJavascript[T any](name string, script string, arguments map[string]any) (T, error) {
+func ExecuteJavascript[T any](name string, script string, arguments map[string]any, globals map[string]any) (T, error) {
 	// TODO cache compiled scripts
 	vm := goja.New()
 	defer vm.Interrupt("halt")
 
 	vm.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
+
+	for name, value := range globals {
+		vm.Set(name, value)
+	}
 
 	var zero T
 

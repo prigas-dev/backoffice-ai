@@ -1,8 +1,10 @@
 package operations_test
 
 import (
+	"database/sql"
 	"testing"
 
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/prigas-dev/backoffice-ai/operations"
 	"github.com/stretchr/testify/assert"
 )
@@ -10,11 +12,20 @@ import (
 func TestOperationExecutor(t *testing.T) {
 	t.Parallel()
 
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		panic(err)
+	}
+
+	t.Cleanup(func() {
+		db.Close()
+	})
+
 	t.Run("operation not found", func(t *testing.T) {
 		t.Parallel()
 
 		store := operations.NewInMemoryOperationStore()
-		executor := operations.NewOperationExecutor(store)
+		executor := operations.NewOperationExecutor(db, store)
 
 		_, err := executor.Execute("op", map[string]any{})
 
@@ -110,7 +121,7 @@ func TestOperationExecutor(t *testing.T) {
 					JavascriptCode: tC.jsCode,
 					Return:         tC.returnSchema,
 				})
-				executor := operations.NewOperationExecutor(store)
+				executor := operations.NewOperationExecutor(db, store)
 
 				value, err := executor.Execute("simple_return", map[string]any{})
 				assert.NoError(t, err)
@@ -133,7 +144,7 @@ func TestOperationExecutor(t *testing.T) {
 				},
 			},
 		})
-		executor := operations.NewOperationExecutor(store)
+		executor := operations.NewOperationExecutor(db, store)
 
 		_, err := executor.Execute("argument_not_provided", map[string]any{})
 
@@ -153,7 +164,7 @@ func TestOperationExecutor(t *testing.T) {
 				},
 			},
 		})
-		executor := operations.NewOperationExecutor(store)
+		executor := operations.NewOperationExecutor(db, store)
 
 		_, err := executor.Execute("invalid_argument", map[string]any{
 			"stuff": 12,
@@ -179,7 +190,7 @@ func TestOperationExecutor(t *testing.T) {
 			JavascriptCode: `function run({ prigas }) { return prigas.length }`,
 		})
 
-		executor := operations.NewOperationExecutor(store)
+		executor := operations.NewOperationExecutor(db, store)
 
 		result, err := executor.Execute("arguments_are_passed", map[string]any{
 			"prigas": "prigas",
@@ -187,5 +198,29 @@ func TestOperationExecutor(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.Equal(t, int64(6), result)
+	})
+
+	t.Run("db function is called", func(t *testing.T) {
+		store := operations.NewInMemoryOperationStore()
+		store.AddOperation(&operations.Operation{
+			Name:       "run-query",
+			Parameters: map[string]*operations.ValueSchema{},
+			Return: &operations.ValueSchema{
+				Type: operations.String,
+				Spec: &operations.StringSpec{},
+			},
+			JavascriptCode: `
+			function run() {
+				const result = query("SELECT 'banana';")
+				return result[0][0]
+			}`,
+		})
+
+		executor := operations.NewOperationExecutor(db, store)
+
+		result, err := executor.Execute("run-query", map[string]any{})
+		assert.NoError(t, err)
+
+		assert.Equal(t, "banana", result)
 	})
 }

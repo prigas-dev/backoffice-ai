@@ -20,7 +20,21 @@ var systemInstructionsTmpl string
 
 var ErrNoValidAnthropicResponse = errors.New("anthropic did not return any valid response")
 
-func Assist(ctx context.Context, db *sql.DB, prompt string, databaseHints string) (*PageComponentView, error) {
+type InstructionsTemplateData struct {
+	SystemName        string
+	SystemDescription string
+	DatabaseEngine    string
+	DatabaseSchema    string
+	DatabaseHints     string
+	ErrorJSONSchema   string
+	ValidFeatureFiles []struct {
+		MarkdownLanguageIdentifier string
+		Filename                   string
+		Content                    string
+	}
+}
+
+func Assist(ctx context.Context, db *sql.DB, prompt string, instructionsTemplateData InstructionsTemplateData) (*PageComponentView, error) {
 
 	client := anthropic.NewClient()
 
@@ -39,15 +53,10 @@ func Assist(ctx context.Context, db *sql.DB, prompt string, databaseHints string
 	log.Println("Parsed system-instructions template")
 
 	var instructionsBuffer bytes.Buffer
-	type TemplateData struct {
-		DatabaseSchema string
-		DatabaseHints  string
-	}
-	data := TemplateData{
-		DatabaseSchema: schema,
-		DatabaseHints:  databaseHints,
-	}
-	err = tmpl.Execute(&instructionsBuffer, data)
+
+	instructionsTemplateData.DatabaseSchema = schema
+
+	err = tmpl.Execute(&instructionsBuffer, instructionsTemplateData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute instructions template: %w", err)
 	}

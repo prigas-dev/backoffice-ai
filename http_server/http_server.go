@@ -88,7 +88,7 @@ func Start(ctx context.Context, db *sql.DB) {
 	}
 	files := afero.NewBasePathFs(afero.NewOsFs(), "tmp/operations")
 	store := operations.NewFsOperationStore(files)
-	executor := operations.NewOperationExecutor(store)
+	executor := operations.NewOperationExecutor(db, store)
 
 	http.HandleFunc("/operations/execute/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -166,7 +166,7 @@ func Start(ctx context.Context, db *sql.DB) {
 			return
 		}
 
-		result, err := AiAssistant.Assist(ctx, db, prompt, "")
+		result, err := AiAssistant.Assist(ctx, db, prompt, AiAssistant.InstructionsTemplateData{})
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

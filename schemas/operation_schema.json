@@ -2,11 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "required": ["name", "javascriptCode", "parameters", "return"],
-  "additionalProperties": false,
   "properties": {
-    "$schema": {
-      "type": "string"
-    },
     "name": {
       "type": "string",
       "description": "Name of the operation slug-case. It's a unique identifier for the operation and should be short and descriptive about what the operation is doing and its parameters",

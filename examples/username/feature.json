@@ -1,0 +1,44 @@
+{
+  "reactComponent": {
+    "tsxCode": "<content of Username.tsx>"
+  },
+  "serverOperations": [
+    {
+      "name": "get-username",
+      "parameters": {},
+      "javascriptCode": "<content of get-username.js>",
+      "return": {
+        "type": "object",
+        "spec": {
+          "properties": {
+            "username": {
+              "type": "string",
+              "spec": {}
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "update-username",
+      "parameters": {
+        "username": {
+          "type": "string",
+          "spec": {}
+        }
+      },
+      "javascriptCode": "<content of update-username.js>",
+      "return": {
+        "type": "object",
+        "spec": {
+          "properties": {
+            "username": {
+              "type": "string",
+              "spec": {}
+            }
+          }
+        }
+      }
+    }
+  ]
+}
