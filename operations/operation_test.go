@@ -97,6 +97,12 @@ func TestValueSchema(t *testing.T) {
 				expectedValidationResult: operations.ValidationResult{Success: true},
 			},
 			{
+				desc:                     "valid string: nil",
+				spec:                     &operations.StringSpec{Nullable: true},
+				value:                    nil,
+				expectedValidationResult: operations.ValidationResult{Success: true},
+			},
+			{
 				desc:                     "invalid string",
 				spec:                     &operations.StringSpec{},
 				value:                    12,
@@ -115,6 +121,12 @@ func TestValueSchema(t *testing.T) {
 				expectedValidationResult: operations.ValidationResult{Success: true},
 			},
 			{
+				desc:                     "valid number: nil",
+				spec:                     &operations.NumberSpec{Nullable: true},
+				value:                    nil,
+				expectedValidationResult: operations.ValidationResult{Success: true},
+			},
+			{
 				desc:                     "invalid number",
 				spec:                     &operations.NumberSpec{},
 				value:                    "",
@@ -124,6 +136,12 @@ func TestValueSchema(t *testing.T) {
 				desc:                     "valid boolean",
 				spec:                     &operations.BooleanSpec{},
 				value:                    false,
+				expectedValidationResult: operations.ValidationResult{Success: true},
+			},
+			{
+				desc:                     "valid boolean: nil",
+				spec:                     &operations.BooleanSpec{Nullable: true},
+				value:                    nil,
 				expectedValidationResult: operations.ValidationResult{Success: true},
 			},
 			{
@@ -150,6 +168,15 @@ func TestValueSchema(t *testing.T) {
 					"strProp":  "prigas",
 					"boolProp": false,
 				},
+				expectedValidationResult: operations.ValidationResult{Success: true},
+			},
+			{
+				desc: "valid object: nil",
+				spec: &operations.ObjectSpec{
+					Properties: map[string]*operations.ValueSchema{},
+					Nullable:   true,
+				},
+				value:                    nil,
 				expectedValidationResult: operations.ValidationResult{Success: true},
 			},
 			{
@@ -186,7 +213,7 @@ func TestValueSchema(t *testing.T) {
 				value: map[string]any{
 					"prigas": "non bool",
 				},
-				expectedValidationResult: operations.ValidationResult{Success: false, Message: "invalid propery prigas: value is not a bool"},
+				expectedValidationResult: operations.ValidationResult{Success: false, Message: "invalid property prigas: value is not a bool"},
 			},
 			{
 				desc: "valid array",
@@ -197,6 +224,18 @@ func TestValueSchema(t *testing.T) {
 					},
 				},
 				value:                    []any{12.0},
+				expectedValidationResult: operations.ValidationResult{Success: true},
+			},
+			{
+				desc: "valid array: nil",
+				spec: &operations.ArraySpec{
+					Nullable: true,
+					Items: &operations.ValueSchema{
+						Type: operations.Number,
+						Spec: &operations.NumberSpec{},
+					},
+				},
+				value:                    nil,
 				expectedValidationResult: operations.ValidationResult{Success: true},
 			},
 			{

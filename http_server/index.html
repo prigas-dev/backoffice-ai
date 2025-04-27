@@ -30,7 +30,7 @@
     </script>
   </head>
   <body>
-    <div class="container d-none">
+    <div class="container">
       <div class="row">
         <div class="col">
           <form id="create-view-form" autocomplete="off">
@@ -103,8 +103,7 @@
             const message = await response.text();
             throw new Error(`[${response.status}] ${message}`);
           }
-          const props = await response.json();
-          await updateReactComponent(props);
+          await updateReactComponent();
         } catch (error) {
           alert(error.message);
           console.error(error);
@@ -146,9 +145,9 @@
 
       // reactComponentWaiting();
 
-      updateReactComponent({});
+      updateReactComponent();
 
-      async function updateReactComponent(props) {
+      async function updateReactComponent() {
         const mod = await import(`./public/component.mjs?t=${Date.now()}`);
         const queryClient = new QueryClient({
           defaultOptions: {
@@ -163,7 +162,7 @@
         root.render(
           h(QueryClientProvider, {
             client: queryClient,
-            children: h(mod.Component, props),
+            children: h(mod.Component, {}),
           })
         );
       }

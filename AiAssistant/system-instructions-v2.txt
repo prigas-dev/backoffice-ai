@@ -74,8 +74,10 @@ POST /operations/execute/{operationName}
 Content-Type: application/json
 
 {
-  "param1": "value1",
-  "param2": "value2"
+  "parameters": {
+    "param1": "value1",
+    "param2": "value2"
+  }
 }
 ```
 

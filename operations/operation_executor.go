@@ -3,6 +3,7 @@ package operations
 import (
 	"database/sql"
 	"fmt"
+	"time"
 )
 
 type IOperationExecutor interface {
@@ -39,7 +40,7 @@ func (o *OperationExecutor) Execute(operationName string, arguments map[string]a
 
 	globals := map[string]any{
 		"query": func(query string, parameters ...any) ([][]any, error) {
-			rows, err := o.db.Query(query)
+			rows, err := o.db.Query(query, parameters...)
 			if err != nil {
 				return nil, err
 			}
@@ -67,6 +68,11 @@ func (o *OperationExecutor) Execute(operationName string, arguments map[string]a
 					// Ensuring byte slices are converted to string
 					if b, ok := val.([]byte); ok {
 						values[i] = string(b)
+					}
+
+					// Ensuring time.Time are converted to string
+					if t, ok := val.(time.Time); ok {
+						values[i] = t.Format(time.RFC3339)
 					}
 				}
 

@@ -48,7 +48,7 @@ func Start(ctx context.Context, db *sql.DB) {
 	})
 
 	type ExecuteOperationRequestBody struct {
-		Arguments map[string]any `json:"arguments"`
+		Parameters map[string]any `json:"parameters"`
 	}
 
 	type ExecuteOperationSuccessResponseBody struct {
@@ -124,7 +124,7 @@ func Start(ctx context.Context, db *sql.DB) {
 			return
 		}
 
-		result, err := executor.Execute(operationName, requestBody.Arguments)
+		result, err := executor.Execute(operationName, requestBody.Parameters)
 		if err != nil {
 			log.Error().Msgf("error on operation execution: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -176,49 +176,6 @@ func Start(ctx context.Context, db *sql.DB) {
 		json.NewEncoder(w).Encode(result)
 	})
 
-	http.HandleFunc("/test-load-view", func(w http.ResponseWriter, r *http.Request) {
-		file, err := os.Open("AiGeneratedViews/todo_tasks_list.json")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer file.Close()
-
-		p := &AiAssistant.PageComponentView{}
-		err = json.NewDecoder(file).Decode(p)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		err = ComponentGenerator.GenerateComponentTSX(p.Component.Code, "./http_server/public")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		props := map[string]any{}
-
-		for _, query := range p.Queries {
-			rows, err := ViewCreator.RunQuery(db, query)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			if query.Mode == AiAssistant.SingleRow {
-				if len(rows) == 1 {
-					props[query.MapToProp] = rows[0]
-				}
-			} else if query.Mode == AiAssistant.MultipleRows {
-				props[query.MapToProp] = rows
-			}
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(props)
-	})
-
 	http.HandleFunc("/new-view", func(w http.ResponseWriter, r *http.Request) {
 		err := r.ParseForm()
 		if err != nil {
@@ -232,14 +189,14 @@ func Start(ctx context.Context, db *sql.DB) {
 			return
 		}
 
-		props, err := ViewCreator.CreateView(ctx, db, prompt)
+		err = ViewCreator.CreateView(ctx, db, store, prompt)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(props)
+		json.NewEncoder(w).Encode(struct{}{})
 	})
 
 	// Start the web server

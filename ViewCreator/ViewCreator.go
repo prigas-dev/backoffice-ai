@@ -7,59 +7,78 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/google/uuid"
 	"github.com/prigas-dev/backoffice-ai/AiAssistant"
 	"github.com/prigas-dev/backoffice-ai/ComponentGenerator"
+	"github.com/prigas-dev/backoffice-ai/examples"
+	"github.com/prigas-dev/backoffice-ai/operations"
+	"github.com/prigas-dev/backoffice-ai/schemas"
+
+	_ "embed"
 )
 
 type ReactComponentProps map[string]any
 
-func CreateView(ctx context.Context, db *sql.DB, prompt string) (*ReactComponentProps, error) {
-	databaseHints := `
+func CreateView(ctx context.Context, db *sql.DB, operationStore operations.IOperationStore, prompt string) error {
+	templateData := AiAssistant.InstructionsTemplateData{
+		SystemName:        "Task Manager",
+		SystemDescription: "Task Manager is a system for managing a team's tasks.",
+		DatabaseHints: `
 These are all possible values for a task status:
 - done
 - todo
 - in_progress
-`
-	templateData := AiAssistant.InstructionsTemplateData{
-		DatabaseHints: databaseHints,
+`,
+		DatabaseEngine:    "sqlite3",
+		FeatureJSONSchema: schemas.FeatureSchema,
+		ErrorJSONSchema:   schemas.ErrorSchema,
+		ValidFeatureJSON:  examples.FeatureJSON,
+		ValidFeatureFiles: []AiAssistant.FeatureFile{
+			{
+				MarkdownLanguageIdentifier: "typescriptreact",
+				Filename:                   examples.ComponentFilename,
+				Content:                    examples.ComponentFileContent,
+			},
+			{
+				MarkdownLanguageIdentifier: "javascript",
+				Filename:                   examples.GetUsernameFilename,
+				Content:                    examples.GetUsernameFileContent,
+			},
+			{
+				MarkdownLanguageIdentifier: "javascript",
+				Filename:                   examples.UpdateUsernameFilename,
+				Content:                    examples.UpdateUsernameFileContent,
+			},
+		},
 	}
 	p, err := AiAssistant.Assist(ctx, db, prompt, templateData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create page component view: %w", err)
+		return fmt.Errorf("failed to create page component view: %w", err)
 	}
 
-	err = SaveViewToJsonFile(p)
+	err = SaveFeatureToJsonFile(p)
 	if err != nil {
-		return nil, fmt.Errorf("failed to save view json file: %w", err)
+		return fmt.Errorf("failed to save view json file: %w", err)
 	}
 
-	err = ComponentGenerator.GenerateComponentTSX(p.Component.Code, "./http_server/public")
+	err = ComponentGenerator.GenerateComponentTSX(p.ReactComponent.TsxCode, "./http_server/public")
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate tsx component: %w", err)
+		return fmt.Errorf("failed to generate tsx component: %w", err)
 	}
 
-	props := ReactComponentProps{}
-
-	for _, query := range p.Queries {
-		rows, err := RunQuery(db, query)
+	for _, operation := range p.ServerOperations {
+		err := operationStore.AddOperation(&operation)
 		if err != nil {
-			return nil, fmt.Errorf("failed to run query %s: %w", query.SQL, err)
-		}
-
-		if query.Mode == AiAssistant.SingleRow {
-			if len(rows) == 1 {
-				props[query.MapToProp] = rows[0]
-			}
-		} else if query.Mode == AiAssistant.MultipleRows {
-			props[query.MapToProp] = rows
+			return fmt.Errorf("failed to store operation %s: %w", operation.Name, err)
 		}
 	}
 
-	return &props, nil
+	return nil
+
 }
 
-func SaveViewToJsonFile(p *AiAssistant.PageComponentView) error {
-	outFile, err := os.Create(fmt.Sprintf("./AiGeneratedViews/%s.json", p.Component.ID))
+func SaveFeatureToJsonFile(p *AiAssistant.FeatureStructure) error {
+	outFile, err := os.Create(fmt.Sprintf("./AiGeneratedViews/%s.json", uuid.NewString()))
 	if err != nil {
 		return fmt.Errorf("failed to create view json file: %w", err)
 	}
@@ -76,49 +95,4 @@ func SaveViewToJsonFile(p *AiAssistant.PageComponentView) error {
 	}
 
 	return nil
-}
-
-func RunQuery(db *sql.DB, query AiAssistant.Query) ([]ReactComponentProps, error) {
-	rows, err := db.Query(query.SQL)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	columns, err := rows.Columns()
-	if err != nil {
-		return nil, err
-	}
-
-	scannedRows := []ReactComponentProps{}
-	for rows.Next() {
-		values := make([]any, len(columns))
-		scanArgs := make([]any, len(columns))
-		for i := range values {
-			scanArgs[i] = &values[i]
-		}
-
-		err := rows.Scan(scanArgs...)
-		if err != nil {
-			return nil, err
-		}
-
-		mapValues := ReactComponentProps{}
-		for i, val := range values {
-			// Ensuring byte slices are converted to string
-			if b, ok := val.([]byte); ok {
-				values[i] = string(b)
-			}
-
-			mapValues[columns[i]] = values[i]
-		}
-
-		scannedRows = append(scannedRows, mapValues)
-	}
-	err = rows.Err()
-	if err != nil {
-		return nil, err
-	}
-
-	return scannedRows, nil
 }

@@ -37,9 +37,14 @@ type ValidationResult struct {
 	Message string `json:"message"`
 }
 
-type StringSpec struct{}
+type StringSpec struct {
+	Nullable bool `json:"nullable"`
+}
 
 func (p *StringSpec) Validate(value any) ValidationResult {
+	if p.Nullable && value == nil {
+		return ValidationResult{Success: true}
+	}
 	_, isString := value.(string)
 	if isString {
 		return ValidationResult{Success: true}
@@ -48,9 +53,14 @@ func (p *StringSpec) Validate(value any) ValidationResult {
 	return ValidationResult{Success: false, Message: "value is not a string"}
 }
 
-type NumberSpec struct{}
+type NumberSpec struct {
+	Nullable bool `json:"nullable"`
+}
 
 func (p *NumberSpec) Validate(value any) ValidationResult {
+	if p.Nullable && value == nil {
+		return ValidationResult{Success: true}
+	}
 	_, isFloat := value.(float64)
 	if !isFloat {
 		_, isInt := value.(int64)
@@ -61,9 +71,14 @@ func (p *NumberSpec) Validate(value any) ValidationResult {
 	return ValidationResult{Success: true}
 }
 
-type BooleanSpec struct{}
+type BooleanSpec struct {
+	Nullable bool `json:"nullable"`
+}
 
 func (p *BooleanSpec) Validate(value any) ValidationResult {
+	if p.Nullable && value == nil {
+		return ValidationResult{Success: true}
+	}
 	_, isBool := value.(bool)
 	if !isBool {
 		return ValidationResult{Success: false, Message: "value is not a bool"}
@@ -72,10 +87,14 @@ func (p *BooleanSpec) Validate(value any) ValidationResult {
 }
 
 type ObjectSpec struct {
+	Nullable   bool                    `json:"nullable"`
 	Properties map[string]*ValueSchema `json:"properties"`
 }
 
 func (p *ObjectSpec) Validate(value any) ValidationResult {
+	if p.Nullable && value == nil {
+		return ValidationResult{Success: true}
+	}
 	object, isMap := value.(map[string]any)
 	if !isMap {
 		return ValidationResult{Success: false, Message: "value is not a map"}
@@ -88,7 +107,7 @@ func (p *ObjectSpec) Validate(value any) ValidationResult {
 
 		properyValidationResult := property.Spec.Validate(propertyValue)
 		if !properyValidationResult.Success {
-			return ValidationResult{Success: false, Message: fmt.Sprintf("invalid propery %s: %s", propertyName, properyValidationResult.Message)}
+			return ValidationResult{Success: false, Message: fmt.Sprintf("invalid property %s: %s", propertyName, properyValidationResult.Message)}
 		}
 	}
 
@@ -96,10 +115,14 @@ func (p *ObjectSpec) Validate(value any) ValidationResult {
 }
 
 type ArraySpec struct {
-	Items *ValueSchema `json:"items"`
+	Nullable bool         `json:"nullable"`
+	Items    *ValueSchema `json:"items"`
 }
 
 func (p *ArraySpec) Validate(value any) ValidationResult {
+	if p.Nullable && value == nil {
+		return ValidationResult{Success: true}
+	}
 	array, isSlice := value.([]any)
 	if !isSlice {
 		return ValidationResult{Success: false, Message: "value is not a slice"}

@@ -13,9 +13,13 @@ import (
 	_ "embed"
 
 	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/prigas-dev/backoffice-ai/operations"
 )
 
-//go:embed system-instructions.txt
+// //go:embed system-instructions.txt
+// var systemInstructionsTmpl string
+
+//go:embed system-instructions-v2.txt
 var systemInstructionsTmpl string
 
 var ErrNoValidAnthropicResponse = errors.New("anthropic did not return any valid response")
@@ -27,14 +31,18 @@ type InstructionsTemplateData struct {
 	DatabaseSchema    string
 	DatabaseHints     string
 	ErrorJSONSchema   string
-	ValidFeatureFiles []struct {
-		MarkdownLanguageIdentifier string
-		Filename                   string
-		Content                    string
-	}
+	FeatureJSONSchema string
+	ValidFeatureJSON  string
+	ValidFeatureFiles []FeatureFile
 }
 
-func Assist(ctx context.Context, db *sql.DB, prompt string, instructionsTemplateData InstructionsTemplateData) (*PageComponentView, error) {
+type FeatureFile struct {
+	MarkdownLanguageIdentifier string
+	Filename                   string
+	Content                    string
+}
+
+func Assist(ctx context.Context, db *sql.DB, prompt string, instructionsTemplateData InstructionsTemplateData) (*FeatureStructure, error) {
 
 	client := anthropic.NewClient()
 
@@ -109,11 +117,11 @@ func Assist(ctx context.Context, db *sql.DB, prompt string, instructionsTemplate
 				}
 			}
 
-			pageComponentView := &PageComponentView{}
-			err = json.Unmarshal([]byte(block.Text), pageComponentView)
+			feature := &FeatureStructure{}
+			err = json.Unmarshal([]byte(block.Text), feature)
 			if err == nil {
 				log.Println("Successfully parsed anthropic response")
-				return pageComponentView, nil
+				return feature, nil
 			}
 
 			lastErr = fmt.Errorf("failed to parse anthropic response, %s: %w", block.Text, err)
@@ -127,27 +135,13 @@ func Assist(ctx context.Context, db *sql.DB, prompt string, instructionsTemplate
 	return nil, lastErr
 }
 
-type QueryMode string
-
-const (
-	SingleRow    QueryMode = "single-row"
-	MultipleRows QueryMode = "multiple-rows"
-)
-
-type Query struct {
-	SQL       string    `json:"sql"`
-	Mode      QueryMode `json:"mode"`      // "single-row" or "multiple-rows"
-	MapToProp string    `json:"mapToProp"` // Name of the property to map the result to
+type FeatureStructure struct {
+	ReactComponent   ReactComponent         `json:"reactComponent"`
+	ServerOperations []operations.Operation `json:"serverOperations"`
 }
 
-type Component struct {
-	ID   string `json:"id"`   // snake_case string identifier
-	Code string `json:"code"` // TSX code
-}
-
-type PageComponentView struct {
-	Queries   []Query   `json:"queries"`
-	Component Component `json:"component"`
+type ReactComponent struct {
+	TsxCode string `json:"tsxCode"`
 }
 
 type ErrorStructure struct {

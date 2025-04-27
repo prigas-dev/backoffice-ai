@@ -1,0 +1,80 @@
+{
+  "reactComponent": {
+    "tsxCode": "import React, { useState } from 'react';\nimport { Card, Container, Row, Col, Badge, Button, Spinner, Modal, Form } from 'react-bootstrap';\nimport { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';\n\ntype Task = {\n  id: number;\n  title: string;\n  description: string;\n  status: 'todo' | 'in_progress' | 'done';\n  priority: number;\n  due_date: string | null;\n};\n\ntype GetTasksResponse = {\n  tasks: Task[];\n};\n\ntype UpdateTaskStatusRequest = {\n  taskId: number;\n  status: 'todo' | 'in_progress' | 'done';\n};\n\ntype UpdateTaskStatusResponse = {\n  success: boolean;\n};\n\nconst statusLabels: Record\u003cstring, string\u003e = {\n  todo: 'To Do',\n  in_progress: 'In Progress',\n  done: 'Done'\n};\n\nconst statusColors: Record\u003cstring, string\u003e = {\n  todo: 'secondary',\n  in_progress: 'primary',\n  done: 'success'\n};\n\nconst priorityLabels: Record\u003cnumber, string\u003e = {\n  1: 'Low',\n  2: 'Medium',\n  3: 'High'\n};\n\nconst priorityColors: Record\u003cnumber, string\u003e = {\n  1: 'info',\n  2: 'warning',\n  3: 'danger'\n};\n\nexport function Component() {\n  const queryClient = useQueryClient();\n  const [selectedTask, setSelectedTask] = useState\u003cTask | null\u003e(null);\n  const [showModal, setShowModal] = useState(false);\n  \n  const { data, isLoading, error } = useQuery\u003cGetTasksResponse\u003e({\n    queryKey: ['tasks'],\n    queryFn: async () =\u003e {\n      const response = await fetch('/operations/execute/get-all-tasks', {\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n        },\n        body: JSON.stringify({ parameters: {} }),\n      });\n      \n      const data = await response.json();\n      if (!data.success) {\n        throw new Error(data.message);\n      }\n      \n      return data.result;\n    },\n  });\n  \n  const updateTaskStatusMutation = useMutation\u003cUpdateTaskStatusResponse, Error, UpdateTaskStatusRequest\u003e({\n    mutationFn: async ({ taskId, status }) =\u003e {\n      const response = await fetch('/operations/execute/update-task-status', {\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n        },\n        body: JSON.stringify({\n          parameters: {\n            taskId,\n            status\n          }\n        }),\n      });\n      \n      const data = await response.json();\n      if (!data.success) {\n        throw new Error(data.message);\n      }\n      \n      return data.result;\n    },\n    onSuccess: () =\u003e {\n      queryClient.invalidateQueries({ queryKey: ['tasks'] });\n      setShowModal(false);\n    },\n  });\n  \n  const handleStatusChange = (task: Task) =\u003e {\n    setSelectedTask(task);\n    setShowModal(true);\n  };\n  \n  const handleUpdateStatus = (status: 'todo' | 'in_progress' | 'done') =\u003e {\n    if (selectedTask) {\n      updateTaskStatusMutation.mutate({\n        taskId: selectedTask.id,\n        status\n      });\n    }\n  };\n  \n  const handleCloseModal = () =\u003e {\n    setShowModal(false);\n    setSelectedTask(null);\n  };\n  \n  if (isLoading) {\n    return (\n      \u003cContainer className=\"mt-4 text-center\"\u003e\n        \u003cSpinner animation=\"border\" /\u003e\n        \u003cp\u003eLoading tasks...\u003c/p\u003e\n      \u003c/Container\u003e\n    );\n  }\n  \n  if (error) {\n    return (\n      \u003cContainer className=\"mt-4\"\u003e\n        \u003cdiv className=\"alert alert-danger\"\u003e\n          Error loading tasks: {error.message}\n        \u003c/div\u003e\n      \u003c/Container\u003e\n    );\n  }\n  \n  const todoTasks = data?.tasks.filter(task =\u003e task.status === 'todo') || [];\n  const inProgressTasks = data?.tasks.filter(task =\u003e task.status === 'in_progress') || [];\n  const doneTasks = data?.tasks.filter(task =\u003e task.status === 'done') || [];\n  \n  return (\n    \u003cContainer fluid className=\"mt-4\"\u003e\n      \u003ch1 className=\"mb-4\"\u003eTask Kanban Board\u003c/h1\u003e\n      \n      \u003cRow\u003e\n        \u003cCol md={4}\u003e\n          \u003cdiv className=\"kanban-column\"\u003e\n            \u003ch4 className=\"text-center p-2 bg-secondary text-white rounded\"\u003eTo Do\u003c/h4\u003e\n            {todoTasks.map(task =\u003e (\n              \u003cTaskCard key={task.id} task={task} onStatusChange={handleStatusChange} /\u003e\n            ))}\n            {todoTasks.length === 0 \u0026\u0026 (\n              \u003cCard className=\"mb-2 text-center p-3 text-muted\"\u003e\n                \u003cem\u003eNo tasks\u003c/em\u003e\n              \u003c/Card\u003e\n            )}\n          \u003c/div\u003e\n        \u003c/Col\u003e\n        \n        \u003cCol md={4}\u003e\n          \u003cdiv className=\"kanban-column\"\u003e\n            \u003ch4 className=\"text-center p-2 bg-primary text-white rounded\"\u003eIn Progress\u003c/h4\u003e\n            {inProgressTasks.map(task =\u003e (\n              \u003cTaskCard key={task.id} task={task} onStatusChange={handleStatusChange} /\u003e\n            ))}\n            {inProgressTasks.length === 0 \u0026\u0026 (\n              \u003cCard className=\"mb-2 text-center p-3 text-muted\"\u003e\n                \u003cem\u003eNo tasks\u003c/em\u003e\n              \u003c/Card\u003e\n            )}\n          \u003c/div\u003e\n        \u003c/Col\u003e\n        \n        \u003cCol md={4}\u003e\n          \u003cdiv className=\"kanban-column\"\u003e\n            \u003ch4 className=\"text-center p-2 bg-success text-white rounded\"\u003eDone\u003c/h4\u003e\n            {doneTasks.map(task =\u003e (\n              \u003cTaskCard key={task.id} task={task} onStatusChange={handleStatusChange} /\u003e\n            ))}\n            {doneTasks.length === 0 \u0026\u0026 (\n              \u003cCard className=\"mb-2 text-center p-3 text-muted\"\u003e\n                \u003cem\u003eNo tasks\u003c/em\u003e\n              \u003c/Card\u003e\n            )}\n          \u003c/div\u003e\n        \u003c/Col\u003e\n      \u003c/Row\u003e\n      \n      \u003cModal show={showModal} onHide={handleCloseModal}\u003e\n        \u003cModal.Header closeButton\u003e\n          \u003cModal.Title\u003eUpdate Task Status\u003c/Modal.Title\u003e\n        \u003c/Modal.Header\u003e\n        \u003cModal.Body\u003e\n          {selectedTask \u0026\u0026 (\n            \u003c\u003e\n              \u003ch5\u003e{selectedTask.title}\u003c/h5\u003e\n              \u003cp\u003e{selectedTask.description}\u003c/p\u003e\n              \u003cForm.Group className=\"mb-3\"\u003e\n                \u003cForm.Label\u003eCurrent Status: \u003cBadge bg={statusColors[selectedTask.status]}\u003e{statusLabels[selectedTask.status]}\u003c/Badge\u003e\u003c/Form.Label\u003e\n                \u003cdiv className=\"d-grid gap-2\"\u003e\n                  \u003cButton \n                    variant=\"secondary\" \n                    onClick={() =\u003e handleUpdateStatus('todo')}\n                    disabled={selectedTask.status === 'todo' || updateTaskStatusMutation.isPending}\n                  \u003e\n                    Move to To Do\n                  \u003c/Button\u003e\n                  \u003cButton \n                    variant=\"primary\" \n                    onClick={() =\u003e handleUpdateStatus('in_progress')}\n                    disabled={selectedTask.status === 'in_progress' || updateTaskStatusMutation.isPending}\n                  \u003e\n                    Move to In Progress\n                  \u003c/Button\u003e\n                  \u003cButton \n                    variant=\"success\" \n                    onClick={() =\u003e handleUpdateStatus('done')}\n                    disabled={selectedTask.status === 'done' || updateTaskStatusMutation.isPending}\n                  \u003e\n                    Move to Done\n                  \u003c/Button\u003e\n                \u003c/div\u003e\n              \u003c/Form.Group\u003e\n            \u003c/\u003e\n          )}\n          {updateTaskStatusMutation.isPending \u0026\u0026 (\n            \u003cdiv className=\"text-center mt-3\"\u003e\n              \u003cSpinner animation=\"border\" size=\"sm\" /\u003e Updating task status...\n            \u003c/div\u003e\n          )}\n          {updateTaskStatusMutation.isError \u0026\u0026 (\n            \u003cdiv className=\"alert alert-danger mt-3\"\u003e\n              {updateTaskStatusMutation.error.message}\n            \u003c/div\u003e\n          )}\n        \u003c/Modal.Body\u003e\n        \u003cModal.Footer\u003e\n          \u003cButton variant=\"secondary\" onClick={handleCloseModal}\u003e\n            Cancel\n          \u003c/Button\u003e\n        \u003c/Modal.Footer\u003e\n      \u003c/Modal\u003e\n      \n      \u003cstyle jsx\u003e{`\n        .kanban-column {\n          min-height: 300px;\n          padding: 10px;\n          background-color: #f8f9fa;\n          border-radius: 5px;\n        }\n      `}\u003c/style\u003e\n    \u003c/Container\u003e\n  );\n}\n\ninterface TaskCardProps {\n  task: Task;\n  onStatusChange: (task: Task) =\u003e void;\n}\n\nfunction TaskCard({ task, onStatusChange }: TaskCardProps) {\n  const formattedDate = task.due_date ? new Date(task.due_date).toLocaleDateString() : 'No due date';\n  \n  return (\n    \u003cCard className=\"mb-2 shadow-sm\"\u003e\n      \u003cCard.Body\u003e\n        \u003cCard.Title\u003e{task.title}\u003c/Card.Title\u003e\n        \u003cCard.Text\u003e{task.description}\u003c/Card.Text\u003e\n        \u003cdiv className=\"d-flex justify-content-between align-items-center\"\u003e\n          \u003cdiv\u003e\n            \u003cBadge bg={statusColors[task.status]} className=\"me-1\"\u003e\n              {statusLabels[task.status]}\n            \u003c/Badge\u003e\n            \u003cBadge bg={priorityColors[task.priority]} className=\"me-1\"\u003e\n              {priorityLabels[task.priority]}\n            \u003c/Badge\u003e\n          \u003c/div\u003e\n          \u003csmall className=\"text-muted\"\u003e{formattedDate}\u003c/small\u003e\n        \u003c/div\u003e\n        \u003cButton \n          variant=\"outline-secondary\" \n          size=\"sm\" \n          className=\"mt-2 w-100\"\n          onClick={() =\u003e onStatusChange(task)}\n        \u003e\n          Change Status\n        \u003c/Button\u003e\n      \u003c/Card.Body\u003e\n    \u003c/Card\u003e\n  );\n}\n"
+  },
+  "serverOperations": [
+    {
+      "name": "get-all-tasks",
+      "javascriptCode": "function run() {\n  const result = query(`\n    SELECT \n      id, \n      title, \n      description, \n      status, \n      priority, \n      due_date \n    FROM tasks \n    WHERE deleted_at IS NULL\n    ORDER BY priority DESC, due_date ASC\n  `);\n  \n  const tasks = result.map(row =\u003e ({\n    id: row[0],\n    title: row[1],\n    description: row[2],\n    status: row[3],\n    priority: row[4],\n    due_date: row[5]\n  }));\n  \n  return { tasks };\n}",
+      "parameters": {},
+      "return": {
+        "type": "object",
+        "spec": {
+          "properties": {
+            "tasks": {
+              "type": "array",
+              "spec": {
+                "items": {
+                  "type": "object",
+                  "spec": {
+                    "properties": {
+                      "description": {
+                        "type": "string",
+                        "spec": {}
+                      },
+                      "due_date": {
+                        "type": "string",
+                        "spec": {}
+                      },
+                      "id": {
+                        "type": "number",
+                        "spec": {}
+                      },
+                      "priority": {
+                        "type": "number",
+                        "spec": {}
+                      },
+                      "status": {
+                        "type": "string",
+                        "spec": {}
+                      },
+                      "title": {
+                        "type": "string",
+                        "spec": {}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "update-task-status",
+      "javascriptCode": "function run({ taskId, status }) {\n  // Validate status is one of the allowed values\n  const validStatuses = ['todo', 'in_progress', 'done'];\n  if (!validStatuses.includes(status)) {\n    throw new Error('Invalid status value. Must be one of: todo, in_progress, done');\n  }\n  \n  // Check if task exists\n  const taskExists = query('SELECT id FROM tasks WHERE id = ? AND deleted_at IS NULL', taskId);\n  if (taskExists.length === 0) {\n    throw new Error(`Task with ID ${taskId} not found`);\n  }\n  \n  // Update the task status\n  query(\n    'UPDATE tasks SET status = ?, updated_at = datetime(\"now\") WHERE id = ?', \n    status, \n    taskId\n  );\n  \n  return { success: true };\n}",
+      "parameters": {
+        "status": {
+          "type": "string",
+          "spec": {}
+        },
+        "taskId": {
+          "type": "number",
+          "spec": {}
+        }
+      },
+      "return": {
+        "type": "object",
+        "spec": {
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "spec": {}
+            }
+          }
+        }
+      }
+    }
+  ]
+}

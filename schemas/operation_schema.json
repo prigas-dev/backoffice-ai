@@ -79,6 +79,7 @@
           "required": ["items"],
           "additionalProperties": false,
           "properties": {
+            "nullable": { "type": "boolean", "default": false },
             "items": { "$ref": "#/definitions/ValueSchema" }
           }
         }
@@ -95,7 +96,9 @@
         "spec": {
           "type": "object",
           "additionalProperties": false,
-          "properties": {}
+          "properties": {
+            "nullable": { "type": "boolean", "default": false }
+          }
         }
       }
     },
@@ -110,7 +113,9 @@
         "spec": {
           "type": "object",
           "additionalProperties": false,
-          "properties": {}
+          "properties": {
+            "nullable": { "type": "boolean", "default": false }
+          }
         }
       }
     },
@@ -127,6 +132,7 @@
           "required": ["properties"],
           "additionalProperties": false,
           "properties": {
+            "nullable": { "type": "boolean", "default": false },
             "properties": {
               "type": "object",
               "additionalProperties": {
@@ -148,7 +154,9 @@
         "spec": {
           "type": "object",
           "additionalProperties": false,
-          "properties": {}
+          "properties": {
+            "nullable": { "type": "boolean", "default": false }
+          }
         }
       }
     },

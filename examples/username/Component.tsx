@@ -133,7 +133,7 @@ async function executeOperation<TParameters, TReturn>(
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(parameters),
+    body: JSON.stringify({ parameters }),
   });
 
   const operationResult = await response.json();
