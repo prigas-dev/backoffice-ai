@@ -8,8 +8,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/prigas-dev/backoffice-ai/http_server"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
+	"github.com/spf13/afero"
 )
 
 func main() {
@@ -26,36 +25,13 @@ func main() {
 	}
 	defer db.Close()
 
+	err = os.MkdirAll("tmp/operations", 0755)
+	if err != nil {
+		panic(err)
+	}
+	operationsFs := afero.NewBasePathFs(afero.NewOsFs(), "tmp/operations")
+
 	ctx := context.Background()
 
-	http_server.Start(ctx, db)
-}
-
-func main_Pages_Database() {
-	db, err := gorm.Open(sqlite.Open("pages.db"), &gorm.Config{})
-	if err != nil {
-		log.Fatalf("Failed to connect to pages.db: %v", err)
-	}
-
-	db.AutoMigrate(&Page{}, &Component{}, &PageComponent{})
-}
-
-func main_HTTP_Server() {
-	HTML()
-}
-
-func main_Sqlite3_Execution_With_AI() {
-
-	dbPath := "./kanban.db"
-	// Open database connection
-	db, err := sql.Open("sqlite3", dbPath)
-	if err != nil {
-		log.Fatalf("Failed to open database: %v", err)
-	}
-	defer db.Close()
-
-	prompt := os.Args[1]
-
-	Sqliter(db, prompt)
-
+	http_server.Start(ctx, db, operationsFs)
 }

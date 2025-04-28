@@ -1,4 +1,4 @@
-package main
+package feature_generator
 
 import (
 	"database/sql"
@@ -9,7 +9,11 @@ import (
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 )
 
-// SchemaInfo holds the complete database schema information
+type IDatabaseSchemaGenerator interface {
+	GenerateSchemaInfo() (*SchemaInfo, error)
+	GenerateSchemaSQL() (string, error)
+}
+
 type SchemaInfo struct {
 	Tables      []string                    `json:"tables"`
 	Columns     map[string][]ColumnInfo     `json:"columns"`
@@ -17,7 +21,6 @@ type SchemaInfo struct {
 	ForeignKeys map[string][]ForeignKeyInfo `json:"foreignKeys"`
 }
 
-// ColumnInfo holds information about a table column
 type ColumnInfo struct {
 	ID           int            `json:"id"`
 	Name         string         `json:"name"`
@@ -27,14 +30,12 @@ type ColumnInfo struct {
 	PrimaryKey   bool           `json:"primaryKey"`
 }
 
-// IndexInfo holds information about a table index
 type IndexInfo struct {
 	Name    string   `json:"name"`
 	Unique  bool     `json:"unique"`
 	Columns []string `json:"columns"`
 }
 
-// ForeignKeyInfo holds information about a foreign key
 type ForeignKeyInfo struct {
 	ID              int    `json:"id"`
 	Seq             int    `json:"seq"`
@@ -46,8 +47,17 @@ type ForeignKeyInfo struct {
 	Match           string `json:"match"`
 }
 
-// GetDatabaseSchema extracts comprehensive schema information from a SQLite database
-func GetDatabaseSchema(db *sql.DB) (*SchemaInfo, error) {
+func NewSqliteSchemaGenerator(db *sql.DB) IDatabaseSchemaGenerator {
+	return &SqliteSchemaGenerator{
+		db: db,
+	}
+}
+
+type SqliteSchemaGenerator struct {
+	db *sql.DB
+}
+
+func (g *SqliteSchemaGenerator) GenerateSchemaInfo() (*SchemaInfo, error) {
 
 	// Initialize schema structure
 	schema := &SchemaInfo{
@@ -58,7 +68,7 @@ func GetDatabaseSchema(db *sql.DB) (*SchemaInfo, error) {
 	}
 
 	// Get all tables
-	rows, err := db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+	rows, err := g.db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
 	if err != nil {
 		return nil, fmt.Errorf("error querying tables: %w", err)
 	}
@@ -75,7 +85,7 @@ func GetDatabaseSchema(db *sql.DB) (*SchemaInfo, error) {
 	// For each table, get columns, indexes, and foreign keys
 	for _, table := range schema.Tables {
 		// Get columns
-		columnRows, err := db.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
+		columnRows, err := g.db.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
 		if err != nil {
 			return nil, fmt.Errorf("error querying columns for table %s: %w", table, err)
 		}
@@ -112,7 +122,7 @@ func GetDatabaseSchema(db *sql.DB) (*SchemaInfo, error) {
 		}
 
 		// Get indexes
-		indexRows, err := db.Query(fmt.Sprintf("PRAGMA index_list(%s)", table))
+		indexRows, err := g.db.Query(fmt.Sprintf("PRAGMA index_list(%s)", table))
 		if err != nil {
 			return nil, fmt.Errorf("error querying indexes for table %s: %w", table, err)
 		}
@@ -130,7 +140,7 @@ func GetDatabaseSchema(db *sql.DB) (*SchemaInfo, error) {
 				indexRows.Close()
 
 				// Reopen a new query and try with fewer columns
-				indexRows, err = db.Query(fmt.Sprintf("PRAGMA index_list(%s)", table))
+				indexRows, err = g.db.Query(fmt.Sprintf("PRAGMA index_list(%s)", table))
 				if err != nil {
 					return nil, fmt.Errorf("error requerying indexes: %w", err)
 				}
@@ -143,7 +153,7 @@ func GetDatabaseSchema(db *sql.DB) (*SchemaInfo, error) {
 
 					// Get columns in this index
 					var indexColumns []string
-					indexInfoRows, err := db.Query(fmt.Sprintf("PRAGMA index_info(%s)", name))
+					indexInfoRows, err := g.db.Query(fmt.Sprintf("PRAGMA index_info(%s)", name))
 					if err != nil {
 						return nil, fmt.Errorf("error querying index info: %w", err)
 					}
@@ -171,7 +181,7 @@ func GetDatabaseSchema(db *sql.DB) (*SchemaInfo, error) {
 			// Process normally if the full scan worked
 			// Get columns in this index
 			var indexColumns []string
-			indexInfoRows, err := db.Query(fmt.Sprintf("PRAGMA index_info(%s)", name))
+			indexInfoRows, err := g.db.Query(fmt.Sprintf("PRAGMA index_info(%s)", name))
 			if err != nil {
 				return nil, fmt.Errorf("error querying index info: %w", err)
 			}
@@ -197,7 +207,7 @@ func GetDatabaseSchema(db *sql.DB) (*SchemaInfo, error) {
 		schema.Indexes[table] = indexes
 
 		// Get foreign keys
-		fkRows, err := db.Query(fmt.Sprintf("PRAGMA foreign_key_list(%s)", table))
+		fkRows, err := g.db.Query(fmt.Sprintf("PRAGMA foreign_key_list(%s)", table))
 		if err != nil {
 			return nil, fmt.Errorf("error querying foreign keys for table %s: %w", table, err)
 		}
@@ -230,8 +240,8 @@ func GetDatabaseSchema(db *sql.DB) (*SchemaInfo, error) {
 	return schema, nil
 }
 
-// GenerateCreateTableSQL generates CREATE TABLE SQL statements for all tables
-func GenerateCreateTableSQL(schema *SchemaInfo) []string {
+// generateCreateTableSQL generates CREATE TABLE SQL statements for all tables
+func (g *SqliteSchemaGenerator) generateCreateTablesSQL(schema *SchemaInfo) []string {
 	var statements []string
 
 	// Process tables in dependency order to handle foreign keys correctly
@@ -265,7 +275,7 @@ func GenerateCreateTableSQL(schema *SchemaInfo) []string {
 			}
 
 			// Generate CREATE TABLE statement
-			statement := generateTableSQL(table, schema)
+			statement := g.generateCreateTableStatement(table, schema)
 			statements = append(statements, statement)
 			processed[table] = true
 		}
@@ -278,7 +288,7 @@ func GenerateCreateTableSQL(schema *SchemaInfo) []string {
 	if len(skippedTables) > 0 {
 		for _, table := range skippedTables {
 			// Generate CREATE TABLE without foreign keys
-			statement := generateTableSQLNoFK(table, schema)
+			statement := g.generateCreateTableStatementNoFK(table, schema)
 			statements = append(statements, statement)
 			processed[table] = true
 
@@ -286,12 +296,12 @@ func GenerateCreateTableSQL(schema *SchemaInfo) []string {
 			for _, fk := range schema.ForeignKeys[table] {
 				alterStatement := fmt.Sprintf(
 					"ALTER TABLE %s ADD CONSTRAINT fk_%s_%s FOREIGN KEY (%s) REFERENCES %s(%s)",
-					quoteIdentifier(table),
+					g.quoteIdentifier(table),
 					table,
 					fk.FromColumn,
-					quoteIdentifier(fk.FromColumn),
-					quoteIdentifier(fk.ReferencedTable),
-					quoteIdentifier(fk.ToColumn),
+					g.quoteIdentifier(fk.FromColumn),
+					g.quoteIdentifier(fk.ReferencedTable),
+					g.quoteIdentifier(fk.ToColumn),
 				)
 
 				if fk.OnDelete != "" && fk.OnDelete != "NO ACTION" {
@@ -324,14 +334,14 @@ func GenerateCreateTableSQL(schema *SchemaInfo) []string {
 
 			columns := make([]string, len(idx.Columns))
 			for i, col := range idx.Columns {
-				columns[i] = quoteIdentifier(col)
+				columns[i] = g.quoteIdentifier(col)
 			}
 
 			indexStatement := fmt.Sprintf(
 				"CREATE%s INDEX %s ON %s (%s);",
 				uniqueStr,
-				quoteIdentifier(idx.Name),
-				quoteIdentifier(table),
+				g.quoteIdentifier(idx.Name),
+				g.quoteIdentifier(table),
 				strings.Join(columns, ", "),
 			)
 			statements = append(statements, indexStatement)
@@ -342,17 +352,17 @@ func GenerateCreateTableSQL(schema *SchemaInfo) []string {
 }
 
 // Generate CREATE TABLE SQL with foreign key constraints
-func generateTableSQL(table string, schema *SchemaInfo) string {
+func (g *SqliteSchemaGenerator) generateCreateTableStatement(table string, schema *SchemaInfo) string {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("CREATE TABLE %s (\n", quoteIdentifier(table)))
+	sb.WriteString(fmt.Sprintf("CREATE TABLE %s (\n", g.quoteIdentifier(table)))
 
 	// Process columns
 	columns := schema.Columns[table]
 	primaryKeys := []string{}
 
 	for i, col := range columns {
-		sb.WriteString("    " + quoteIdentifier(col.Name) + " " + col.Type)
+		sb.WriteString("    " + g.quoteIdentifier(col.Name) + " " + col.Type)
 
 		if col.NotNull {
 			sb.WriteString(" NOT NULL")
@@ -368,7 +378,7 @@ func generateTableSQL(table string, schema *SchemaInfo) string {
 				sb.WriteString(fmt.Sprintf(" DEFAULT %s", col.DefaultValue.String))
 			} else {
 				// It's a string
-				sb.WriteString(fmt.Sprintf(" DEFAULT '%s'", escapeSingleQuotes(col.DefaultValue.String)))
+				sb.WriteString(fmt.Sprintf(" DEFAULT '%s'", g.escapeSingleQuotes(col.DefaultValue.String)))
 			}
 		}
 
@@ -386,7 +396,7 @@ func generateTableSQL(table string, schema *SchemaInfo) string {
 	if len(primaryKeys) > 0 {
 		quotedKeys := make([]string, len(primaryKeys))
 		for i, key := range primaryKeys {
-			quotedKeys[i] = quoteIdentifier(key)
+			quotedKeys[i] = g.quoteIdentifier(key)
 		}
 		sb.WriteString(fmt.Sprintf("    PRIMARY KEY (%s)", strings.Join(quotedKeys, ", ")))
 
@@ -400,9 +410,9 @@ func generateTableSQL(table string, schema *SchemaInfo) string {
 	// Add FOREIGN KEY constraints
 	for i, fk := range schema.ForeignKeys[table] {
 		sb.WriteString(fmt.Sprintf("    FOREIGN KEY (%s) REFERENCES %s(%s)",
-			quoteIdentifier(fk.FromColumn),
-			quoteIdentifier(fk.ReferencedTable),
-			quoteIdentifier(fk.ToColumn),
+			g.quoteIdentifier(fk.FromColumn),
+			g.quoteIdentifier(fk.ReferencedTable),
+			g.quoteIdentifier(fk.ToColumn),
 		))
 
 		if fk.OnDelete != "" && fk.OnDelete != "NO ACTION" {
@@ -424,17 +434,17 @@ func generateTableSQL(table string, schema *SchemaInfo) string {
 }
 
 // Generate CREATE TABLE SQL without foreign key constraints
-func generateTableSQLNoFK(table string, schema *SchemaInfo) string {
+func (g *SqliteSchemaGenerator) generateCreateTableStatementNoFK(table string, schema *SchemaInfo) string {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("CREATE TABLE %s (\n", quoteIdentifier(table)))
+	sb.WriteString(fmt.Sprintf("CREATE TABLE %s (\n", g.quoteIdentifier(table)))
 
 	// Process columns
 	columns := schema.Columns[table]
 	primaryKeys := []string{}
 
 	for i, col := range columns {
-		sb.WriteString("    " + quoteIdentifier(col.Name) + " " + col.Type)
+		sb.WriteString("    " + g.quoteIdentifier(col.Name) + " " + col.Type)
 
 		if col.NotNull {
 			sb.WriteString(" NOT NULL")
@@ -450,7 +460,7 @@ func generateTableSQLNoFK(table string, schema *SchemaInfo) string {
 				sb.WriteString(fmt.Sprintf(" DEFAULT %s", col.DefaultValue.String))
 			} else {
 				// It's a string
-				sb.WriteString(fmt.Sprintf(" DEFAULT '%s'", escapeSingleQuotes(col.DefaultValue.String)))
+				sb.WriteString(fmt.Sprintf(" DEFAULT '%s'", g.escapeSingleQuotes(col.DefaultValue.String)))
 			}
 		}
 
@@ -468,7 +478,7 @@ func generateTableSQLNoFK(table string, schema *SchemaInfo) string {
 	if len(primaryKeys) > 0 {
 		quotedKeys := make([]string, len(primaryKeys))
 		for i, key := range primaryKeys {
-			quotedKeys[i] = quoteIdentifier(key)
+			quotedKeys[i] = g.quoteIdentifier(key)
 		}
 		sb.WriteString(fmt.Sprintf("    PRIMARY KEY (%s)\n", strings.Join(quotedKeys, ", ")))
 	}
@@ -478,7 +488,7 @@ func generateTableSQLNoFK(table string, schema *SchemaInfo) string {
 }
 
 // Quote identifier if needed
-func quoteIdentifier(id string) string {
+func (g *SqliteSchemaGenerator) quoteIdentifier(id string) string {
 	// If the identifier contains special characters or is a reserved keyword, quote it
 	if strings.ContainsAny(id, " ,-+*/()[]{}.") ||
 		strings.ToLower(id) == "table" ||
@@ -493,14 +503,14 @@ func quoteIdentifier(id string) string {
 }
 
 // Escape single quotes in string values
-func escapeSingleQuotes(s string) string {
+func (g *SqliteSchemaGenerator) escapeSingleQuotes(s string) string {
 	return strings.ReplaceAll(s, "'", "''")
 }
 
 // PrintSchemaAsSQL prints the database schema as SQL statements
-func PrintSchemaAsSQL(db *sql.DB) (string, error) {
+func (g *SqliteSchemaGenerator) GenerateSchemaSQL() (string, error) {
 
-	schema, err := GetDatabaseSchema(db)
+	schema, err := g.GenerateSchemaInfo()
 	if err != nil {
 		return "", fmt.Errorf("Failed to get database schema: %w", err)
 	}
@@ -511,7 +521,7 @@ func PrintSchemaAsSQL(db *sql.DB) (string, error) {
 	schemaStr += fmt.Sprintln("PRAGMA foreign_keys = ON;")
 	schemaStr += fmt.Sprintln("")
 
-	statements := GenerateCreateTableSQL(schema)
+	statements := g.generateCreateTablesSQL(schema)
 	for _, stmt := range statements {
 		schemaStr += fmt.Sprintln(stmt)
 		schemaStr += fmt.Sprintln("")

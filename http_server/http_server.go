@@ -8,22 +8,27 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/phuslu/log"
 	"github.com/spf13/afero"
+	"github.com/victormf2/gosyringe"
 
-	"github.com/prigas-dev/backoffice-ai/AiAssistant"
 	"github.com/prigas-dev/backoffice-ai/ComponentGenerator"
-	"github.com/prigas-dev/backoffice-ai/ViewCreator"
+	"github.com/prigas-dev/backoffice-ai/feature_generator"
+	"github.com/prigas-dev/backoffice-ai/feature_generator/instruction_files"
 	"github.com/prigas-dev/backoffice-ai/operations"
 )
 
 //go:embed index.html
 var templates embed.FS
 
-func Start(ctx context.Context, db *sql.DB) {
+func Start(ctx context.Context, db *sql.DB, operationsFs afero.Fs) {
+
+	container := gosyringe.NewContainer()
+
+	RegisterServices(container, db, operationsFs)
+
 	// Parse the HTML template
 	tmpl, err := template.ParseFS(templates, "*.html")
 	if err != nil {
@@ -82,14 +87,6 @@ func Start(ctx context.Context, db *sql.DB) {
 		return operationName, nil
 	}
 
-	err = os.MkdirAll("tmp/operations", 0755)
-	if err != nil {
-		panic(err)
-	}
-	files := afero.NewBasePathFs(afero.NewOsFs(), "tmp/operations")
-	store := operations.NewFsOperationStore(files)
-	executor := operations.NewOperationExecutor(db, store)
-
 	http.HandleFunc("/operations/execute/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			log.Warn().Msgf("request with invalid method: %v", r.Method)
@@ -124,6 +121,17 @@ func Start(ctx context.Context, db *sql.DB) {
 			return
 		}
 
+		executor, err := gosyringe.Resolve[operations.IOperationExecutor](container)
+		if err != nil {
+			log.Error().Msgf("error instantiating operation executor: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(ExecuteOperationErrorResponseBody{
+				Success: false,
+				Message: fmt.Sprintf("error instantiating operation executor: %v", err),
+			})
+			return
+		}
+
 		result, err := executor.Execute(operationName, requestBody.Parameters)
 		if err != nil {
 			log.Error().Msgf("error on operation execution: %v", err)
@@ -152,30 +160,6 @@ func Start(ctx context.Context, db *sql.DB) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	http.HandleFunc("/test-anthropic", func(w http.ResponseWriter, r *http.Request) {
-
-		err := r.ParseForm()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		prompt := r.Form.Get("prompt")
-		if len(prompt) == 0 {
-			http.Error(w, "prompt is required", http.StatusBadRequest)
-			return
-		}
-
-		result, err := AiAssistant.Assist(ctx, db, prompt, AiAssistant.InstructionsTemplateData{})
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
-	})
-
 	http.HandleFunc("/new-view", func(w http.ResponseWriter, r *http.Request) {
 		err := r.ParseForm()
 		if err != nil {
@@ -189,7 +173,13 @@ func Start(ctx context.Context, db *sql.DB) {
 			return
 		}
 
-		err = ViewCreator.CreateView(ctx, db, store, prompt)
+		featureGenerator, err := gosyringe.Resolve[feature_generator.IFeatureGenerator](container)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		err = featureGenerator.GenerateFeature(ctx, prompt)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -202,4 +192,35 @@ func Start(ctx context.Context, db *sql.DB) {
 	// Start the web server
 	log.Info().Msg("Server starting on http://localhost:8080")
 	log.Fatal().Err(http.ListenAndServe(":8080", nil)).Msg("exit")
+}
+
+func RegisterServices(c *gosyringe.Container, db *sql.DB, operationsFs afero.Fs) {
+
+	gosyringe.RegisterValue[*sql.DB](c, db)
+
+	gosyringe.RegisterValue[afero.Fs](c, operationsFs)
+	gosyringe.RegisterSingleton[operations.IOperationStore](c, operations.NewFsOperationStore)
+
+	gosyringe.RegisterSingleton[feature_generator.IDatabaseSchemaGenerator](c, feature_generator.NewSqliteSchemaGenerator)
+	templateData := &feature_generator.InstructionsTemplateData{
+		SystemName:        "Task Manager",
+		SystemDescription: "Task Manager is a system for managing a team's tasks.",
+		DatabaseHints: `
+These are all possible values for a task status:
+- done
+- todo
+- in_progress
+`,
+		DatabaseEngine:    "sqlite3",
+		FeatureJSONSchema: instruction_files.FeatureJSONSchema.Content,
+		ErrorJSONSchema:   instruction_files.ErrorJSONSchema.Content,
+		ValidFeatureJSON:  instruction_files.ExampleFeatureJSON.Content,
+		ValidFeatureFiles: instruction_files.ExampleFeatureFiles,
+	}
+	gosyringe.RegisterValue[*feature_generator.InstructionsTemplateData](c, templateData)
+	gosyringe.RegisterSingleton[feature_generator.IAIGenerator](c, feature_generator.NewAIGenerator)
+
+	gosyringe.RegisterSingleton[feature_generator.IFeatureGenerator](c, feature_generator.NewReactFeatureGenerator)
+
+	gosyringe.RegisterSingleton[operations.IOperationExecutor](c, operations.NewOperationExecutor)
 }

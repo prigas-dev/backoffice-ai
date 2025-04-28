@@ -1,4 +1,4 @@
-package AiAssistant
+package feature_generator
 
 import (
 	"bytes"
@@ -13,16 +13,36 @@ import (
 	_ "embed"
 
 	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/prigas-dev/backoffice-ai/feature_generator/instruction_files"
 	"github.com/prigas-dev/backoffice-ai/operations"
 )
 
-// //go:embed system-instructions.txt
-// var systemInstructionsTmpl string
+type IAIGenerator interface {
+	Generate(ctx context.Context, prompt string) (*Feature, error)
+}
 
-//go:embed system-instructions-v2.txt
-var systemInstructionsTmpl string
+type Feature struct {
+	ReactComponent   ReactComponent         `json:"reactComponent"`
+	ServerOperations []operations.Operation `json:"serverOperations"`
+}
 
-var ErrNoValidAnthropicResponse = errors.New("anthropic did not return any valid response")
+type ReactComponent struct {
+	TsxCode string `json:"tsxCode"`
+}
+
+func NewAIGenerator(db *sql.DB, databaseSchemaGenerator IDatabaseSchemaGenerator, instructionsTemplateData *InstructionsTemplateData) IAIGenerator {
+	return &AnthropicGenerator{
+		db:                       db,
+		databaseSchemaGenerator:  databaseSchemaGenerator,
+		instructionsTemplateData: instructionsTemplateData,
+	}
+}
+
+type AnthropicGenerator struct {
+	db                       *sql.DB
+	databaseSchemaGenerator  IDatabaseSchemaGenerator
+	instructionsTemplateData *InstructionsTemplateData
+}
 
 type InstructionsTemplateData struct {
 	SystemName        string
@@ -33,27 +53,21 @@ type InstructionsTemplateData struct {
 	ErrorJSONSchema   string
 	FeatureJSONSchema string
 	ValidFeatureJSON  string
-	ValidFeatureFiles []FeatureFile
+	ValidFeatureFiles []instruction_files.File
 }
 
-type FeatureFile struct {
-	MarkdownLanguageIdentifier string
-	Filename                   string
-	Content                    string
-}
-
-func Assist(ctx context.Context, db *sql.DB, prompt string, instructionsTemplateData InstructionsTemplateData) (*FeatureStructure, error) {
+func (g *AnthropicGenerator) Generate(ctx context.Context, prompt string) (*Feature, error) {
 
 	client := anthropic.NewClient()
 
-	schema, err := PrintSchemaAsSQL(db)
+	schema, err := g.databaseSchemaGenerator.GenerateSchemaSQL()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get db schema: %w", err)
 	}
 
 	log.Println("Got schema from SQLite3 database")
 
-	tmpl, err := template.New("system-instructions").Parse(systemInstructionsTmpl)
+	tmpl, err := template.New("system-instructions").Parse(instruction_files.SystemInstructionsTemplate.Content)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse instructions template: %w", err)
 	}
@@ -62,9 +76,9 @@ func Assist(ctx context.Context, db *sql.DB, prompt string, instructionsTemplate
 
 	var instructionsBuffer bytes.Buffer
 
-	instructionsTemplateData.DatabaseSchema = schema
+	g.instructionsTemplateData.DatabaseSchema = schema
 
-	err = tmpl.Execute(&instructionsBuffer, instructionsTemplateData)
+	err = tmpl.Execute(&instructionsBuffer, g.instructionsTemplateData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute instructions template: %w", err)
 	}
@@ -108,7 +122,7 @@ func Assist(ctx context.Context, db *sql.DB, prompt string, instructionsTemplate
 
 			log.Println(block.Text)
 
-			errorStructure := &ErrorStructure{}
+			errorStructure := &AIGenerationError{}
 			err := json.Unmarshal([]byte(block.Text), errorStructure)
 			if err == nil {
 				if len(errorStructure.Error) > 0 {
@@ -117,7 +131,7 @@ func Assist(ctx context.Context, db *sql.DB, prompt string, instructionsTemplate
 				}
 			}
 
-			feature := &FeatureStructure{}
+			feature := &Feature{}
 			err = json.Unmarshal([]byte(block.Text), feature)
 			if err == nil {
 				log.Println("Successfully parsed anthropic response")
@@ -135,15 +149,8 @@ func Assist(ctx context.Context, db *sql.DB, prompt string, instructionsTemplate
 	return nil, lastErr
 }
 
-type FeatureStructure struct {
-	ReactComponent   ReactComponent         `json:"reactComponent"`
-	ServerOperations []operations.Operation `json:"serverOperations"`
-}
+var ErrNoValidAnthropicResponse = errors.New("anthropic did not return any valid response")
 
-type ReactComponent struct {
-	TsxCode string `json:"tsxCode"`
-}
-
-type ErrorStructure struct {
+type AIGenerationError struct {
 	Error string `json:"error"`
 }

@@ -143,9 +143,9 @@
         );
       }
 
-      // reactComponentWaiting();
+      reactComponentWaiting();
 
-      updateReactComponent();
+      // updateReactComponent();
 
       async function updateReactComponent() {
         const mod = await import(`./public/component.mjs?t=${Date.now()}`);

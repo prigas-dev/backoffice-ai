@@ -1,0 +1,101 @@
+{
+  "reactComponent": {
+    "tsxCode": "import { useQuery } from '@tanstack/react-query';\nimport { useState } from 'react';\nimport { Table, Pagination, Badge, Spinner, Alert, Form } from 'react-bootstrap';\n\ntype Task = {\n  id: number;\n  title: string;\n  description: string;\n  status: string;\n  priority: number;\n  due_date: string;\n};\n\ntype TasksResponse = {\n  tasks: Task[];\n  totalPages: number;\n};\n\nexport function Component() {\n  const [currentPage, setCurrentPage] = useState(1);\n  const [pageSize, setPageSize] = useState(10);\n  \n  const { data, isLoading, isError, error } = useQuery({\n    queryKey: ['tasks', currentPage, pageSize],\n    queryFn: async () =\u003e {\n      const response = await fetch(`/operations/execute/get-tasks-by-due-date`, {\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n        },\n        body: JSON.stringify({\n          parameters: {\n            page: currentPage,\n            pageSize: pageSize\n          }\n        }),\n      });\n      \n      const result = await response.json();\n      \n      if (!result.success) {\n        throw new Error(result.message);\n      }\n      \n      return result.result;\n    },\n  });\n  \n  const handlePageChange = (page: number) =\u003e {\n    setCurrentPage(page);\n  };\n  \n  const handlePageSizeChange = (e: React.ChangeEvent\u003cHTMLSelectElement\u003e) =\u003e {\n    setPageSize(Number(e.target.value));\n    setCurrentPage(1); // Reset to first page when changing page size\n  };\n  \n  if (isLoading) {\n    return (\n      \u003cdiv className=\"d-flex justify-content-center my-5\"\u003e\n        \u003cSpinner animation=\"border\" role=\"status\"\u003e\n          \u003cspan className=\"visually-hidden\"\u003eLoading...\u003c/span\u003e\n        \u003c/Spinner\u003e\n      \u003c/div\u003e\n    );\n  }\n  \n  if (isError) {\n    return (\n      \u003cAlert variant=\"danger\"\u003e\n        Error loading tasks: {(error as Error).message}\n      \u003c/Alert\u003e\n    );\n  }\n  \n  const renderPagination = () =\u003e {\n    if (!data || data.totalPages \u003c= 1) return null;\n    \n    const items = [];\n    \n    // Previous button\n    items.push(\n      \u003cPagination.Prev \n        key=\"prev\"\n        onClick={() =\u003e handlePageChange(currentPage - 1)}\n        disabled={currentPage === 1}\n      /\u003e\n    );\n    \n    // Page numbers\n    for (let page = 1; page \u003c= data.totalPages; page++) {\n      items.push(\n        \u003cPagination.Item\n          key={page}\n          active={page === currentPage}\n          onClick={() =\u003e handlePageChange(page)}\n        \u003e\n          {page}\n        \u003c/Pagination.Item\u003e\n      );\n    }\n    \n    // Next button\n    items.push(\n      \u003cPagination.Next\n        key=\"next\"\n        onClick={() =\u003e handlePageChange(currentPage + 1)}\n        disabled={currentPage === data.totalPages}\n      /\u003e\n    );\n    \n    return \u003cPagination\u003e{items}\u003c/Pagination\u003e;\n  };\n  \n  const getStatusBadge = (status: string) =\u003e {\n    switch (status) {\n      case 'done':\n        return \u003cBadge bg=\"success\"\u003eDone\u003c/Badge\u003e;\n      case 'in_progress':\n        return \u003cBadge bg=\"warning\"\u003eIn Progress\u003c/Badge\u003e;\n      case 'todo':\n        return \u003cBadge bg=\"secondary\"\u003eTo Do\u003c/Badge\u003e;\n      default:\n        return \u003cBadge bg=\"info\"\u003e{status}\u003c/Badge\u003e;\n    }\n  };\n  \n  const getPriorityBadge = (priority: number) =\u003e {\n    if (priority \u003e= 3) return \u003cBadge bg=\"danger\"\u003eHigh\u003c/Badge\u003e;\n    if (priority === 2) return \u003cBadge bg=\"warning\"\u003eMedium\u003c/Badge\u003e;\n    return \u003cBadge bg=\"info\"\u003eLow\u003c/Badge\u003e;\n  };\n  \n  const formatDate = (dateString: string) =\u003e {\n    if (!dateString) return 'No date';\n    const date = new Date(dateString);\n    return date.toLocaleDateString();\n  };\n  \n  const isOverdue = (dateString: string) =\u003e {\n    if (!dateString) return false;\n    const dueDate = new Date(dateString);\n    const today = new Date();\n    today.setHours(0, 0, 0, 0);\n    return dueDate \u003c today;\n  };\n  \n  return (\n    \u003cdiv className=\"container mt-4\"\u003e\n      \u003ch2 className=\"mb-4\"\u003eTasks by Due Date\u003c/h2\u003e\n      \n      \u003cdiv className=\"d-flex justify-content-end mb-3\"\u003e\n        \u003cForm.Group style={{ width: '150px' }}\u003e\n          \u003cForm.Select \n            value={pageSize} \n            onChange={handlePageSizeChange}\n            aria-label=\"Page size\"\n          \u003e\n            \u003coption value=\"5\"\u003e5 per page\u003c/option\u003e\n            \u003coption value=\"10\"\u003e10 per page\u003c/option\u003e\n            \u003coption value=\"25\"\u003e25 per page\u003c/option\u003e\n            \u003coption value=\"50\"\u003e50 per page\u003c/option\u003e\n          \u003c/Form.Select\u003e\n        \u003c/Form.Group\u003e\n      \u003c/div\u003e\n      \n      {data \u0026\u0026 data.tasks.length \u003e 0 ? (\n        \u003c\u003e\n          \u003cTable striped bordered hover responsive\u003e\n            \u003cthead\u003e\n              \u003ctr\u003e\n                \u003cth\u003eTitle\u003c/th\u003e\n                \u003cth\u003eDescription\u003c/th\u003e\n                \u003cth\u003eStatus\u003c/th\u003e\n                \u003cth\u003ePriority\u003c/th\u003e\n                \u003cth\u003eDue Date\u003c/th\u003e\n              \u003c/tr\u003e\n            \u003c/thead\u003e\n            \u003ctbody\u003e\n              {data.tasks.map((task) =\u003e (\n                \u003ctr key={task.id}\u003e\n                  \u003ctd\u003e{task.title}\u003c/td\u003e\n                  \u003ctd\u003e{task.description}\u003c/td\u003e\n                  \u003ctd\u003e{getStatusBadge(task.status)}\u003c/td\u003e\n                  \u003ctd\u003e{getPriorityBadge(task.priority)}\u003c/td\u003e\n                  \u003ctd className={isOverdue(task.due_date) ? 'text-danger fw-bold' : ''}\u003e\n                    {formatDate(task.due_date)}\n                    {isOverdue(task.due_date) \u0026\u0026 ' (Overdue)'}\n                  \u003c/td\u003e\n                \u003c/tr\u003e\n              ))}\n            \u003c/tbody\u003e\n          \u003c/Table\u003e\n          \n          \u003cdiv className=\"d-flex justify-content-center mt-4\"\u003e\n            {renderPagination()}\n          \u003c/div\u003e\n        \u003c/\u003e\n      ) : (\n        \u003cAlert variant=\"info\"\u003eNo tasks found\u003c/Alert\u003e\n      )}\n    \u003c/div\u003e\n  );\n}\n"
+  },
+  "serverOperations": [
+    {
+      "name": "get-tasks-by-due-date",
+      "javascriptCode": "function run({ page, pageSize }) {\n  // Validate inputs\n  if (!page || page \u003c 1) page = 1;\n  if (!pageSize || pageSize \u003c 1) pageSize = 10;\n  \n  // Calculate offset for pagination\n  const offset = (page - 1) * pageSize;\n  \n  // Get total count for pagination\n  const countResult = query(\"SELECT COUNT(*) FROM tasks WHERE deleted_at IS NULL\");\n  const totalCount = countResult[0][0];\n  const totalPages = Math.ceil(totalCount / pageSize);\n  \n  // Get tasks ordered by due date (from oldest to newest)\n  // NULL due dates will be at the end\n  const tasksResult = query(\n    `SELECT id, title, description, status, priority, due_date \n     FROM tasks \n     WHERE deleted_at IS NULL \n     ORDER BY \n       CASE WHEN due_date IS NULL THEN 1 ELSE 0 END, \n       due_date ASC \n     LIMIT ? OFFSET ?`,\n    pageSize,\n    offset\n  );\n  \n  // Format the results\n  const tasks = tasksResult.map(row =\u003e ({\n    id: row[0],\n    title: row[1],\n    description: row[2],\n    status: row[3],\n    priority: row[4],\n    due_date: row[5]\n  }));\n  \n  return {\n    tasks,\n    totalPages,\n    currentPage: page,\n    pageSize\n  };\n}",
+      "parameters": {
+        "page": {
+          "type": "number",
+          "spec": {
+            "nullable": false
+          }
+        },
+        "pageSize": {
+          "type": "number",
+          "spec": {
+            "nullable": false
+          }
+        }
+      },
+      "return": {
+        "type": "object",
+        "spec": {
+          "nullable": false,
+          "properties": {
+            "currentPage": {
+              "type": "number",
+              "spec": {
+                "nullable": false
+              }
+            },
+            "pageSize": {
+              "type": "number",
+              "spec": {
+                "nullable": false
+              }
+            },
+            "tasks": {
+              "type": "array",
+              "spec": {
+                "nullable": false,
+                "items": {
+                  "type": "object",
+                  "spec": {
+                    "nullable": false,
+                    "properties": {
+                      "description": {
+                        "type": "string",
+                        "spec": {
+                          "nullable": true
+                        }
+                      },
+                      "due_date": {
+                        "type": "string",
+                        "spec": {
+                          "nullable": true
+                        }
+                      },
+                      "id": {
+                        "type": "number",
+                        "spec": {
+                          "nullable": false
+                        }
+                      },
+                      "priority": {
+                        "type": "number",
+                        "spec": {
+                          "nullable": true
+                        }
+                      },
+                      "status": {
+                        "type": "string",
+                        "spec": {
+                          "nullable": false
+                        }
+                      },
+                      "title": {
+                        "type": "string",
+                        "spec": {
+                          "nullable": false
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "totalPages": {
+              "type": "number",
+              "spec": {
+                "nullable": false
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
