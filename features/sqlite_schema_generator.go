@@ -1,4 +1,4 @@
-package feature_generator
+package features
 
 import (
 	"database/sql"
@@ -512,7 +512,7 @@ func (g *SqliteSchemaGenerator) GenerateSchemaSQL() (string, error) {
 
 	schema, err := g.GenerateSchemaInfo()
 	if err != nil {
-		return "", fmt.Errorf("Failed to get database schema: %w", err)
+		return "", fmt.Errorf("failed to get database schema: %w", err)
 	}
 
 	schemaStr := ""

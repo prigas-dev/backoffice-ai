@@ -6,5 +6,5 @@
     "esModuleInterop": true,
     "lib": ["DOM", "ES2023"]
   },
-  "include": ["./sample/*.tsx"]
+  "include": ["./sample/*.tsx", "./src/**/*.tsx"]
 }

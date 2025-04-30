@@ -3,206 +3,89 @@ package http_server
 import (
 	"context"
 	"database/sql"
-	"embed"
-	"encoding/json"
 	"fmt"
-	"html/template"
 	"net/http"
-	"strings"
+	"os"
 
 	"github.com/phuslu/log"
 	"github.com/spf13/afero"
 	"github.com/victormf2/gosyringe"
 
-	"github.com/prigas-dev/backoffice-ai/ComponentGenerator"
-	"github.com/prigas-dev/backoffice-ai/feature_generator"
-	"github.com/prigas-dev/backoffice-ai/feature_generator/instruction_files"
+	"github.com/prigas-dev/backoffice-ai/features"
+	"github.com/prigas-dev/backoffice-ai/frontend"
+	"github.com/prigas-dev/backoffice-ai/http_server/handlers"
 	"github.com/prigas-dev/backoffice-ai/operations"
 )
 
-//go:embed index.html
-var templates embed.FS
-
-func Start(ctx context.Context, db *sql.DB, operationsFs afero.Fs) {
+func Start(ctx context.Context) {
 
 	container := gosyringe.NewContainer()
 
-	RegisterServices(container, db, operationsFs)
-
-	// Parse the HTML template
-	tmpl, err := template.ParseFS(templates, "*.html")
+	RegisterServices(container)
+	db, err := gosyringe.Resolve[*sql.DB](container)
 	if err != nil {
-		log.Fatal().Msgf("Error parsing template: %v", err)
+		log.Fatal().Err(fmt.Errorf("failed to instance db: %w", err))
 	}
+	defer db.Close()
 
 	fs := http.FileServer(http.Dir("http_server/public"))
 	http.Handle("/public/", http.StripPrefix("/public/", fs))
 
-	// Handle the home page
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		type PageData struct{}
-		// Sample data for our template
-		data := PageData{}
-
-		err := tmpl.ExecuteTemplate(w, "index.html", data)
-		if err != nil {
-			log.Printf("Error executing template: %v", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-	})
-
-	type ExecuteOperationRequestBody struct {
-		Parameters map[string]any `json:"parameters"`
-	}
-
-	type ExecuteOperationSuccessResponseBody struct {
-		Success bool `json:"success"`
-		Result  any  `json:"result"`
-	}
-
-	type ExecuteOperationErrorResponseBody struct {
-		Success bool   `json:"success"`
-		Message string `json:"message"`
-	}
-
-	getOperationName := func(r *http.Request) (string, error) {
-
-		pathSegments := strings.Split(
-			strings.TrimLeft(r.URL.Path, "/"),
-			"/",
-		)
-
-		if len(pathSegments) == 0 {
-			return "", fmt.Errorf("request path is empty")
-		}
-
-		// /operations/execute/{operationName}
-		if len(pathSegments) != 3 {
-			return "", fmt.Errorf("invalid request path")
-		}
-
-		operationName := pathSegments[len(pathSegments)-1]
-
-		return operationName, nil
-	}
-
-	http.HandleFunc("/operations/execute/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			log.Warn().Msgf("request with invalid method: %v", r.Method)
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(ExecuteOperationErrorResponseBody{
-				Success: false,
-				Message: "only POST method is allowed",
-			})
-			return
-		}
-
-		operationName, err := getOperationName(r)
-		if err != nil {
-			log.Warn().Msgf("request with invalid path %v: %v", r.URL.Path, err)
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(ExecuteOperationErrorResponseBody{
-				Success: false,
-				Message: err.Error(),
-			})
-			return
-		}
-
-		requestBody := ExecuteOperationRequestBody{}
-		err = json.NewDecoder(r.Body).Decode(&requestBody)
-		if err != nil {
-			log.Warn().Msgf("failed to parse request parameters: %v", err)
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(ExecuteOperationErrorResponseBody{
-				Success: false,
-				Message: "failed to parse request parameters",
-			})
-			return
-		}
-
-		executor, err := gosyringe.Resolve[operations.IOperationExecutor](container)
-		if err != nil {
-			log.Error().Msgf("error instantiating operation executor: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(ExecuteOperationErrorResponseBody{
-				Success: false,
-				Message: fmt.Sprintf("error instantiating operation executor: %v", err),
-			})
-			return
-		}
-
-		result, err := executor.Execute(operationName, requestBody.Parameters)
-		if err != nil {
-			log.Error().Msgf("error on operation execution: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(ExecuteOperationErrorResponseBody{
-				Success: false,
-				Message: fmt.Sprintf("error on operation execution: %v", err),
-			})
-			return
-		}
-
-		json.NewEncoder(w).Encode(ExecuteOperationSuccessResponseBody{
-			Success: true,
-			Result:  result,
-		})
-	})
-
-	http.HandleFunc("/generate-component", func(w http.ResponseWriter, r *http.Request) {
-
-		err := ComponentGenerator.GenerateComponentSample("./http_server/public")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-	})
-
-	http.HandleFunc("/new-view", func(w http.ResponseWriter, r *http.Request) {
-		err := r.ParseForm()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		prompt := r.Form.Get("prompt")
-		if len(prompt) == 0 {
-			http.Error(w, "prompt is required", http.StatusBadRequest)
-			return
-		}
-
-		featureGenerator, err := gosyringe.Resolve[feature_generator.IFeatureGenerator](container)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		err = featureGenerator.GenerateFeature(ctx, prompt)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(struct{}{})
-	})
+	handlers.Index()
+	handlers.OperationsExecute(container)
+	handlers.CreateFeature(container)
+	handlers.GetAllFeatures(container)
+	handlers.TestBuilder(container)
 
 	// Start the web server
 	log.Info().Msg("Server starting on http://localhost:8080")
 	log.Fatal().Err(http.ListenAndServe(":8080", nil)).Msg("exit")
 }
 
-func RegisterServices(c *gosyringe.Container, db *sql.DB, operationsFs afero.Fs) {
+func RegisterServices(c *gosyringe.Container) {
+	dbPath := "kanban.db"
+	// Open database connection
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		log.Fatal().Err(fmt.Errorf("failed to open database: %w", err))
+	}
+
+	operationsFolder := "fstore/operations"
+	err = os.MkdirAll(operationsFolder, 0755)
+	if err != nil {
+		log.Fatal().Err(fmt.Errorf("failed to create operations folder: %w", err))
+	}
+	operationsFs := afero.NewBasePathFs(afero.NewOsFs(), operationsFolder)
+
+	frontendFolder := "frontend"
+	componentsFs := afero.NewBasePathFs(afero.NewOsFs(), frontendFolder)
+
+	featuresFolder := "fstore/features"
+	err = os.MkdirAll(featuresFolder, 0755)
+	if err != nil {
+		log.Fatal().Err(fmt.Errorf("failed to create features folder: %w", err))
+	}
+	featuresFs := afero.NewBasePathFs(afero.NewOsFs(), featuresFolder)
+
+	frontendBuilderConfig := &frontend.BuilderConfig{
+		Entrypoint:        "frontend/src/main.tsx",
+		DestinationFolder: "http_server/public",
+	}
 
 	gosyringe.RegisterValue[*sql.DB](c, db)
 
-	gosyringe.RegisterValue[afero.Fs](c, operationsFs)
+	gosyringe.RegisterValue[operations.OperationsFs](c, operationsFs)
 	gosyringe.RegisterSingleton[operations.IOperationStore](c, operations.NewFsOperationStore)
+	gosyringe.RegisterValue[features.ComponentsFs](c, componentsFs)
+	gosyringe.RegisterSingleton[features.IComponentStore](c, features.NewFsComponentStore)
+	gosyringe.RegisterValue[features.FeaturesFs](c, featuresFs)
+	gosyringe.RegisterSingleton[features.IFeatureStore](c, features.NewFsFeatureStore)
 
-	gosyringe.RegisterSingleton[feature_generator.IDatabaseSchemaGenerator](c, feature_generator.NewSqliteSchemaGenerator)
-	templateData := &feature_generator.InstructionsTemplateData{
+	gosyringe.RegisterSingleton[frontend.IBuilder](c, frontend.NewBuilder)
+	gosyringe.RegisterValue[*frontend.BuilderConfig](c, frontendBuilderConfig)
+
+	gosyringe.RegisterSingleton[features.IDatabaseSchemaGenerator](c, features.NewSqliteSchemaGenerator)
+	templateData := &features.InstructionsTemplateData{
 		SystemName:        "Task Manager",
 		SystemDescription: "Task Manager is a system for managing a team's tasks.",
 		DatabaseHints: `
@@ -211,16 +94,12 @@ These are all possible values for a task status:
 - todo
 - in_progress
 `,
-		DatabaseEngine:    "sqlite3",
-		FeatureJSONSchema: instruction_files.FeatureJSONSchema.Content,
-		ErrorJSONSchema:   instruction_files.ErrorJSONSchema.Content,
-		ValidFeatureJSON:  instruction_files.ExampleFeatureJSON.Content,
-		ValidFeatureFiles: instruction_files.ExampleFeatureFiles,
+		DatabaseEngine: "sqlite3",
 	}
-	gosyringe.RegisterValue[*feature_generator.InstructionsTemplateData](c, templateData)
-	gosyringe.RegisterSingleton[feature_generator.IAIGenerator](c, feature_generator.NewAIGenerator)
+	gosyringe.RegisterValue[*features.InstructionsTemplateData](c, templateData)
+	gosyringe.RegisterSingleton[features.IAIGenerator](c, features.NewAIGenerator)
 
-	gosyringe.RegisterSingleton[feature_generator.IFeatureGenerator](c, feature_generator.NewReactFeatureGenerator)
+	gosyringe.RegisterSingleton[features.IFeatureGenerator](c, features.NewReactFeatureGenerator)
 
 	gosyringe.RegisterSingleton[operations.IOperationExecutor](c, operations.NewOperationExecutor)
 }

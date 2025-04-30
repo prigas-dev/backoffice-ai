@@ -1,0 +1,50 @@
+{
+  "name": "get-all-tasks",
+  "javascriptCode": "function run() {\n  const result = query(`\n    SELECT \n      id, \n      title, \n      description, \n      status, \n      priority, \n      due_date \n    FROM tasks \n    WHERE deleted_at IS NULL\n    ORDER BY priority DESC, due_date ASC\n  `);\n  \n  const tasks = result.map(row =\u003e ({\n    id: row[0],\n    title: row[1],\n    description: row[2],\n    status: row[3],\n    priority: row[4],\n    due_date: row[5]\n  }));\n  \n  return { tasks };\n}",
+  "parameters": {},
+  "return": {
+    "type": "object",
+    "spec": {
+      "properties": {
+        "tasks": {
+          "type": "array",
+          "spec": {
+            "items": {
+              "type": "object",
+              "spec": {
+                "properties": {
+                  "description": {
+                    "type": "string",
+                    "spec": {}
+                  },
+                  "due_date": {
+                    "type": "string",
+                    "spec": {
+                      "nullable": true
+                    }
+                  },
+                  "id": {
+                    "type": "number",
+                    "spec": {}
+                  },
+                  "priority": {
+                    "type": "number",
+                    "spec": {}
+                  },
+                  "status": {
+                    "type": "string",
+                    "spec": {}
+                  },
+                  "title": {
+                    "type": "string",
+                    "spec": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

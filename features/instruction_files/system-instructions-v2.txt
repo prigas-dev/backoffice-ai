@@ -64,7 +64,7 @@ Write the component using TSX syntax (Typescript + JSX).
 
 Write all the needed code in a single file. Give priority to use react-bootstrap components, but you can add functions and other components to the code if needed, as long as you don't use other packages than the only ones allowed.
 
-The code must export a function called Component, which will be the main component the system will use to render the view.
+The code must export a default function Component, which will be the main component the system will use to render the view.
 
 To call the server operations, you are encoraged to use @tanstack/react-query (v5). Don't add a QueryClientProvider, as it is already setup. You can just use the hooks (useQuery, useMutation, etc).
 

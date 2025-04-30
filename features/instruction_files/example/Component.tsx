@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Form, Spinner } from "react-bootstrap";
 import { useForm } from "react-hook-form";
 
-export function Component() {
+export default function Component() {
   const { data: username, isPending, isError, error } = useQueryUsername();
 
   if (isPending) {

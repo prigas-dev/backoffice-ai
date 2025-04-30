@@ -1,6 +1,9 @@
 {
+  "name": "username-form",
+  "label": "Username Form",
+  "description": "Show current username and allow to update it.",
   "reactComponent": {
-    "tsxCode": "<content of Username.tsx>"
+    "tsxCode": "<content of Component.tsx>"
   },
   "serverOperations": [
     {

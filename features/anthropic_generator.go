@@ -1,20 +1,19 @@
-package feature_generator
+package features
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
-	"text/template"
 
 	_ "embed"
 
 	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/prigas-dev/backoffice-ai/feature_generator/instruction_files"
+	"github.com/prigas-dev/backoffice-ai/features/instruction_files"
 	"github.com/prigas-dev/backoffice-ai/operations"
+	"github.com/prigas-dev/backoffice-ai/utils"
 )
 
 type IAIGenerator interface {
@@ -22,8 +21,11 @@ type IAIGenerator interface {
 }
 
 type Feature struct {
-	ReactComponent   ReactComponent         `json:"reactComponent"`
-	ServerOperations []operations.Operation `json:"serverOperations"`
+	Name             string                  `json:"name"`
+	Label            string                  `json:"label"`
+	Description      string                  `json:"description"`
+	ReactComponent   *ReactComponent         `json:"reactComponent"`
+	ServerOperations []*operations.Operation `json:"serverOperations"`
 }
 
 type ReactComponent struct {
@@ -32,24 +34,41 @@ type ReactComponent struct {
 
 func NewAIGenerator(db *sql.DB, databaseSchemaGenerator IDatabaseSchemaGenerator, instructionsTemplateData *InstructionsTemplateData) IAIGenerator {
 	return &AnthropicGenerator{
-		db:                       db,
-		databaseSchemaGenerator:  databaseSchemaGenerator,
-		instructionsTemplateData: instructionsTemplateData,
+		db:                      db,
+		databaseSchemaGenerator: databaseSchemaGenerator,
+		instructionsTemplateData: &AnthropicInstructionsTemplateData{
+			SystemName:        instructionsTemplateData.SystemName,
+			SystemDescription: instructionsTemplateData.SystemDescription,
+			DatabaseEngine:    instructionsTemplateData.DatabaseEngine,
+			DatabaseHints:     instructionsTemplateData.DatabaseHints,
+			FeatureJSONSchema: instruction_files.FeatureJSONSchema.Content,
+			ErrorJSONSchema:   instruction_files.ErrorJSONSchema.Content,
+			ValidFeatureJSON:  instruction_files.ExampleFeatureJSON.Content,
+			ValidFeatureFiles: instruction_files.ExampleFeatureFiles,
+		},
 	}
-}
-
-type AnthropicGenerator struct {
-	db                       *sql.DB
-	databaseSchemaGenerator  IDatabaseSchemaGenerator
-	instructionsTemplateData *InstructionsTemplateData
 }
 
 type InstructionsTemplateData struct {
 	SystemName        string
 	SystemDescription string
 	DatabaseEngine    string
-	DatabaseSchema    string
 	DatabaseHints     string
+}
+
+type AnthropicGenerator struct {
+	db                       *sql.DB
+	databaseSchemaGenerator  IDatabaseSchemaGenerator
+	instructionsTemplateData *AnthropicInstructionsTemplateData
+}
+
+type AnthropicInstructionsTemplateData struct {
+	SystemName        string
+	SystemDescription string
+	DatabaseEngine    string
+	DatabaseHints     string
+
+	DatabaseSchema    string
 	ErrorJSONSchema   string
 	FeatureJSONSchema string
 	ValidFeatureJSON  string
@@ -67,23 +86,11 @@ func (g *AnthropicGenerator) Generate(ctx context.Context, prompt string) (*Feat
 
 	log.Println("Got schema from SQLite3 database")
 
-	tmpl, err := template.New("system-instructions").Parse(instruction_files.SystemInstructionsTemplate.Content)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse instructions template: %w", err)
-	}
-
-	log.Println("Parsed system-instructions template")
-
-	var instructionsBuffer bytes.Buffer
-
 	g.instructionsTemplateData.DatabaseSchema = schema
-
-	err = tmpl.Execute(&instructionsBuffer, g.instructionsTemplateData)
+	instructions, err := utils.DoTemplate("system-instructions", instruction_files.SystemInstructionsTemplate.Content, g.instructionsTemplateData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute instructions template: %w", err)
+		return nil, fmt.Errorf("failed to generate instructions: %w", err)
 	}
-
-	instructions := instructionsBuffer.String()
 
 	log.Println("Executed template successfuly")
 

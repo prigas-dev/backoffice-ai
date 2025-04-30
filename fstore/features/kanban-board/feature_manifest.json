@@ -1,0 +1,6 @@
+{
+  "name": "kanban-board",
+  "label": "Kanban",
+  "description": "Kanban board to do stuff",
+  "operations": ["get-all-tasks", "update-task-status"]
+}

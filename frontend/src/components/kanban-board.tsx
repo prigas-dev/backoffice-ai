@@ -58,7 +58,7 @@ const priorityColors: Record<number, string> = {
   3: "danger",
 };
 
-export function Component() {
+export default function Component() {
   const queryClient = useQueryClient();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showModal, setShowModal] = useState(false);

@@ -40,10 +40,11 @@ func (s *InMemoryOperationStore) AddOperation(operation *Operation) error {
 }
 
 type FsOperationStore struct {
-	fs afero.Fs
+	fs OperationsFs
 }
+type OperationsFs afero.Fs
 
-func NewFsOperationStore(fs afero.Fs) IOperationStore {
+func NewFsOperationStore(fs OperationsFs) IOperationStore {
 	return &FsOperationStore{
 		fs: fs,
 	}
