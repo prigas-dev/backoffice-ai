@@ -1,0 +1,44 @@
+{
+  "name": "get-users",
+  "parameters": {},
+  "return": {
+    "type": "object",
+    "spec": {
+      "nullable": false,
+      "properties": {
+        "users": {
+          "type": "array",
+          "spec": {
+            "nullable": false,
+            "items": {
+              "type": "object",
+              "spec": {
+                "nullable": false,
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "spec": {
+                      "nullable": false
+                    }
+                  },
+                  "id": {
+                    "type": "number",
+                    "spec": {
+                      "nullable": false
+                    }
+                  },
+                  "name": {
+                    "type": "string",
+                    "spec": {
+                      "nullable": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

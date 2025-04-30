@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/google/uuid"
 	"github.com/prigas-dev/backoffice-ai/frontend"
 
 	_ "embed"
@@ -59,7 +58,7 @@ func (g *ReactFeatureGenerator) GenerateFeature(ctx context.Context, prompt stri
 }
 
 func SaveFeatureToJsonFile(p *Feature) error {
-	outFile, err := os.Create(fmt.Sprintf("./AiGeneratedViews/%s.json", uuid.NewString()))
+	outFile, err := os.Create(fmt.Sprintf("./AiGeneratedViews/%s.json", p.Name))
 	if err != nil {
 		return fmt.Errorf("failed to create view json file: %w", err)
 	}

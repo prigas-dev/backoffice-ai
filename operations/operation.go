@@ -12,6 +12,12 @@ type Operation struct {
 	Return         *ValueSchema            `json:"return"`
 }
 
+type OperationManifest struct {
+	Name       string                  `json:"name"`
+	Parameters map[string]*ValueSchema `json:"parameters"`
+	Return     *ValueSchema            `json:"return"`
+}
+
 type ValueSchema struct {
 	Type    Type            `json:"type"`
 	Spec    Spec            `json:"-"`

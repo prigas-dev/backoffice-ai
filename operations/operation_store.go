@@ -51,37 +51,68 @@ func NewFsOperationStore(fs OperationsFs) IOperationStore {
 }
 
 func (s *FsOperationStore) GetOperation(operationName string) (*Operation, error) {
-	fileName := fmt.Sprintf("%s.json", operationName)
+	manifestFileName := fmt.Sprintf("%s/operation_manifest.json", operationName)
 
-	file, err := s.fs.Open(fileName)
+	manifestFile, err := s.fs.Open(manifestFileName)
 	if err != nil {
-		return nil, fmt.Errorf("could not open file %s: %w", fileName, err)
+		return nil, fmt.Errorf("could not open file %s: %w", manifestFileName, err)
 	}
-	defer file.Close()
+	defer manifestFile.Close()
 
-	operation := Operation{}
-	err = json.NewDecoder(file).Decode(&operation)
+	operationManifest := OperationManifest{}
+	err = json.NewDecoder(manifestFile).Decode(&operationManifest)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse operation json from file %s: %w", fileName, err)
+		return nil, fmt.Errorf("failed to parse operation manifest json from file %s: %w", manifestFileName, err)
 	}
 
-	return &operation, nil
+	javscriptCodeFileName := fmt.Sprintf("%s/operation.js", operationName)
+	javascriptCode, err := afero.ReadFile(s.fs, javscriptCodeFileName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read operation javascript coe from file %s: %w", javscriptCodeFileName, err)
+	}
+
+	operation := &Operation{
+		Name:           operationManifest.Name,
+		JavascriptCode: string(javascriptCode),
+		Parameters:     operationManifest.Parameters,
+		Return:         operationManifest.Return,
+	}
+
+	return operation, nil
 }
 
 func (s *FsOperationStore) AddOperation(operation *Operation) error {
-	fileName := fmt.Sprintf("%s.json", operation.Name)
 
-	file, err := s.fs.Create(fileName)
+	err := s.fs.MkdirAll(operation.Name, 0755)
 	if err != nil {
-		return fmt.Errorf("could not open file %s: %w", fileName, err)
+		return fmt.Errorf("failed to create operation %s folder: %w", operation.Name, err)
+	}
+
+	manifestFileName := fmt.Sprintf("%s/operation_manifest.json", operation.Name)
+
+	file, err := s.fs.Create(manifestFileName)
+	if err != nil {
+		return fmt.Errorf("could not open file %s: %w", manifestFileName, err)
 	}
 	defer file.Close()
 
+	operationManifest := OperationManifest{
+		Name:       operation.Name,
+		Parameters: operation.Parameters,
+		Return:     operation.Return,
+	}
+
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
-	err = encoder.Encode(operation)
+	err = encoder.Encode(operationManifest)
 	if err != nil {
-		return fmt.Errorf("failed to write operation json to file %s: %w", fileName, err)
+		return fmt.Errorf("failed to write operation manifest to file %s: %w", manifestFileName, err)
+	}
+
+	javscriptCodeFileName := fmt.Sprintf("%s/operation.js", operation.Name)
+	err = afero.WriteFile(s.fs, javscriptCodeFileName, []byte(operation.JavascriptCode), 0755)
+	if err != nil {
+		return fmt.Errorf("failed to write operation javascript code to file %s: %w", javscriptCodeFileName, err)
 	}
 
 	return nil

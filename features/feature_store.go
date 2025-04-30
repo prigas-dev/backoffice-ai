@@ -137,7 +137,7 @@ func (s *FsFeatureStore) AddFeature(feature *Feature) error {
 		return fmt.Errorf("failed to write feature %s manifest file: %w", feature.Name, err)
 	}
 
-	err = s.componentStore.AddComponent(feature.Name, feature.ReactComponent.TsxCode)
+	err = s.componentStore.AddComponent(feature.Name, []byte(feature.ReactComponent.TsxCode))
 	if err != nil {
 		return fmt.Errorf("failed to store component for feature: %s: %w", feature.Name, err)
 	}

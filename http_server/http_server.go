@@ -3,6 +3,7 @@ package http_server
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -98,8 +99,30 @@ These are all possible values for a task status:
 	}
 	gosyringe.RegisterValue[*features.InstructionsTemplateData](c, templateData)
 	gosyringe.RegisterSingleton[features.IAIGenerator](c, features.NewAIGenerator)
+	// gosyringe.RegisterSingleton[features.IAIGenerator](c, NewTestAIGenerator)
 
 	gosyringe.RegisterSingleton[features.IFeatureGenerator](c, features.NewReactFeatureGenerator)
 
 	gosyringe.RegisterSingleton[operations.IOperationExecutor](c, operations.NewOperationExecutor)
+}
+
+type TestAIGenerator struct{}
+
+func NewTestAIGenerator() features.IAIGenerator {
+	return &TestAIGenerator{}
+}
+
+func (g *TestAIGenerator) Generate(ctx context.Context, prompt string) (*features.Feature, error) {
+	featureJson, err := os.ReadFile("AiGeneratedViews/b701b9f0-21e7-44fe-ba2a-f488521ecffa.json")
+	if err != nil {
+		return nil, err
+	}
+
+	feature := features.Feature{}
+	err = json.Unmarshal(featureJson, &feature)
+	if err != nil {
+		return nil, err
+	}
+
+	return &feature, nil
 }

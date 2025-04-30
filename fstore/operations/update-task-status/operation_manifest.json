@@ -1,0 +1,24 @@
+{
+  "name": "update-task-status",
+  "parameters": {
+    "status": {
+      "type": "string",
+      "spec": {}
+    },
+    "taskId": {
+      "type": "number",
+      "spec": {}
+    }
+  },
+  "return": {
+    "type": "object",
+    "spec": {
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "spec": {}
+        }
+      }
+    }
+  }
+}

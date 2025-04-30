@@ -13,7 +13,15 @@ import { createRoot } from "react-dom/client";
 import { Prompt } from "./Prompt";
 
 const FeatureComponents: Record<string, FC> = {
+
   "kanban-board": lazy(() => import("./components/kanban-board")),
+
+  "task-dashboard": lazy(() => import("./components/task-dashboard")),
+
+  "task-list-with-user-filter": lazy(() => import("./components/task-list-with-user-filter")),
+
+  "task-statistics-dashboard": lazy(() => import("./components/task-statistics-dashboard")),
+
 };
 
 window.addEventListener("DOMContentLoaded", async function () {

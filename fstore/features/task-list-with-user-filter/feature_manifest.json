@@ -1,0 +1,9 @@
+{
+  "name": "task-list-with-user-filter",
+  "label": "Task List with User Filter",
+  "description": "A list view of tasks with the ability to filter by user using a dropdown selector.",
+  "operations": [
+    "get-users",
+    "get-tasks-by-user-id"
+  ]
+}

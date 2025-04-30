@@ -72,14 +72,14 @@ function CreateViewForm({ onFeatureCreated }: CreateViewFormProps) {
   return (
     <>
       <Form autoComplete="off" onSubmit={form.handleSubmit(onSubmit)}>
-        <Form.Group className="mb-3" controlId="prompt">
-          <Form.Label>Prompt</Form.Label>
+        <Form.Group className="mb-3 mt-3" controlId="prompt">
+          <Form.Label>Feature description</Form.Label>
           <Form.Control
-            type="text"
-            placeholder="Show me all tasks with due date until today"
+            as="textarea"
+            rows={5}
+            placeholder="ex: Show me all tasks with due date until today"
             {...form.register("prompt")}
           />
-          <Form.Text className="text-muted">Sky is the limit</Form.Text>
         </Form.Group>
         <Button type="submit" variant="primary" disabled={isSubmitting}>
           Submit
@@ -89,7 +89,7 @@ function CreateViewForm({ onFeatureCreated }: CreateViewFormProps) {
         <Loader />
       ) : (
         <Row className="justify-content-center">
-          <Col xs="auto">Prompt!</Col>
+          <Col xs="auto">Prompt something to create a new feature</Col>
         </Row>
       )}
     </>

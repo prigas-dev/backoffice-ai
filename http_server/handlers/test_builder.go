@@ -9,7 +9,7 @@ import (
 )
 
 func TestBuilder(container *gosyringe.Container) {
-	http.HandleFunc("/test-builder", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/build", func(w http.ResponseWriter, r *http.Request) {
 		builder, err := gosyringe.Resolve[frontend.IBuilder](container)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to instance IBuilder: %v", err), http.StatusInternalServerError)

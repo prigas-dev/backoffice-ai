@@ -3,8 +3,6 @@ package features
 import (
 	_ "embed"
 	"fmt"
-	"io"
-	"io/fs"
 	"path"
 	"strings"
 
@@ -13,7 +11,7 @@ import (
 )
 
 type IComponentStore interface {
-	AddComponent(name string, tsxCode string) error
+	AddComponent(name string, tsxCode []byte) error
 	GetComponent(name string) ([]byte, error)
 }
 
@@ -31,19 +29,13 @@ type FsComponentStore struct {
 
 var componentsFolder = path.Join("src", "components")
 
-func (s *FsComponentStore) AddComponent(name string, tsxCode string) error {
+func (s *FsComponentStore) AddComponent(name string, tsxCode []byte) error {
 	err := s.fs.MkdirAll(componentsFolder, 0755)
 	if err != nil {
 		return fmt.Errorf("failed to create components folder: %w", err)
 	}
 
-	componentFile, err := s.fs.Open(path.Join(componentsFolder, fmt.Sprintf("%s.tsx", name)))
-	if err != nil {
-		return fmt.Errorf("failed to open component file: %w", err)
-	}
-	defer componentFile.Close()
-
-	_, err = io.WriteString(componentFile, tsxCode)
+	err = afero.WriteFile(s.fs, path.Join(componentsFolder, fmt.Sprintf("%s.tsx", name)), tsxCode, 0755)
 	if err != nil {
 		return fmt.Errorf("failed to write component file: %w", err)
 	}
@@ -61,10 +53,12 @@ var mainTsxTemplate string
 
 func (s *FsComponentStore) regenerateRoot() error {
 	componentNames := []string{}
-	err := afero.Walk(s.fs, componentsFolder, func(path string, info fs.FileInfo, err error) error {
-		if err == nil {
-			return nil
-		}
+	componentFiles, err := afero.ReadDir(s.fs, componentsFolder)
+	if err != nil {
+		return fmt.Errorf("failed to read components folder: %w", err)
+	}
+
+	for _, info := range componentFiles {
 		if info.IsDir() {
 			return nil
 		}
@@ -76,11 +70,6 @@ func (s *FsComponentStore) regenerateRoot() error {
 		componentName := strings.TrimSuffix(info.Name(), ".tsx")
 
 		componentNames = append(componentNames, componentName)
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to retrieve components: %w", err)
 	}
 
 	mainTsx, err := utils.DoTemplate("main.tsx", mainTsxTemplate, map[string]any{
@@ -91,7 +80,7 @@ func (s *FsComponentStore) regenerateRoot() error {
 		return fmt.Errorf("failed to generate main.tsx: %w", err)
 	}
 
-	err = afero.WriteFile(s.fs, "main.tsx", []byte(mainTsx), 0755)
+	err = afero.WriteFile(s.fs, "src/main.tsx", []byte(mainTsx), 0755)
 	if err != nil {
 		return fmt.Errorf("failed to write main.tsx file: %w", err)
 	}
