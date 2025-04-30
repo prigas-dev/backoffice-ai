@@ -1,13 +1,6 @@
 {
-  "name": "get-tasks-by-user-id",
-  "parameters": {
-    "userId": {
-      "type": "number",
-      "spec": {
-        "nullable": true
-      }
-    }
-  },
+  "name": "get-tasks",
+  "parameters": {},
   "return": {
     "type": "object",
     "spec": {
@@ -28,7 +21,7 @@
                       "nullable": false
                     }
                   },
-                  "dueDate": {
+                  "due_date": {
                     "type": "string",
                     "spec": {
                       "nullable": true
@@ -58,10 +51,36 @@
                       "nullable": false
                     }
                   },
-                  "userName": {
-                    "type": "string",
+                  "users": {
+                    "type": "array",
                     "spec": {
-                      "nullable": true
+                      "nullable": false,
+                      "items": {
+                        "type": "object",
+                        "spec": {
+                          "nullable": false,
+                          "properties": {
+                            "email": {
+                              "type": "string",
+                              "spec": {
+                                "nullable": false
+                              }
+                            },
+                            "id": {
+                              "type": "number",
+                              "spec": {
+                                "nullable": false
+                              }
+                            },
+                            "name": {
+                              "type": "string",
+                              "spec": {
+                                "nullable": false
+                              }
+                            }
+                          }
+                        }
+                      }
                     }
                   }
                 }

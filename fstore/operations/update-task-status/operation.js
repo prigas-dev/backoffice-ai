@@ -1,27 +1,28 @@
-function run({ taskId, status }) {
-  // Validate status is one of the allowed values
-  const validStatuses = ["todo", "in_progress", "done"];
+function run({ task_id, status }) {
+  // Validate status
+  const validStatuses = ['todo', 'in_progress', 'done'];
   if (!validStatuses.includes(status)) {
-    throw new Error(
-      "Invalid status value. Must be one of: todo, in_progress, done"
-    );
+    throw new Error(`Invalid status: ${status}. Must be one of: ${validStatuses.join(', ')}`);
   }
-
-  // Check if task exists
-  const taskExists = query(
-    "SELECT id FROM tasks WHERE id = ? AND deleted_at IS NULL",
-    taskId
-  );
-  if (taskExists.length === 0) {
-    throw new Error(`Task with ID ${taskId} not found`);
+  
+  // Get current timestamp
+  const now = new Date().toISOString();
+  
+  // Update task status
+  const result = query(`
+    UPDATE tasks
+    SET status = ?, updated_at = ?
+    WHERE id = ? AND deleted_at IS NULL
+    RETURNING id
+  `, status, now, task_id);
+  
+  if (!result || result.length === 0) {
+    throw new Error(`Task with ID ${task_id} not found or could not be updated`);
   }
-
-  // Update the task status
-  query(
-    'UPDATE tasks SET status = ?, updated_at = datetime("now") WHERE id = ?',
-    status,
-    taskId
-  );
-
-  return { success: true };
+  
+  return { 
+    success: true,
+    task_id: result[0][0],
+    status
+  };
 }

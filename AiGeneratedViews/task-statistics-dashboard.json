@@ -1,0 +1,119 @@
+{
+  "name": "task-statistics-dashboard",
+  "label": "Task Statistics Dashboard",
+  "description": "A dashboard showing key statistics about tasks including counts by status, priority distribution, and upcoming due dates.",
+  "reactComponent": {
+    "tsxCode": "import React from 'react';\nimport { Card, Container, Row, Col, Badge, ListGroup, Spinner, Alert } from 'react-bootstrap';\nimport { useQuery } from '@tanstack/react-query';\n\ntype TaskStatistics = {\n  statusCounts: {\n    status: string;\n    count: number;\n  }[];\n  priorityCounts: {\n    priority: number;\n    count: number;\n  }[];\n  upcomingTasks: {\n    id: number;\n    title: string;\n    due_date: string;\n    status: string;\n  }[];\n  totalTasks: number;\n};\n\ntype OperationResponse\u003cT\u003e = {\n  success: boolean;\n  result?: T;\n  message?: string;\n};\n\nexport default function Component() {\n  const { data, isLoading, error } = useQuery\u003cTaskStatistics, Error\u003e({\n    queryKey: ['taskStatistics'],\n    queryFn: async () =\u003e {\n      const response = await fetch('/operations/execute/get-task-statistics', {\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n        },\n        body: JSON.stringify({ parameters: {} }),\n      });\n      \n      const data = await response.json() as OperationResponse\u003cTaskStatistics\u003e;\n      \n      if (!data.success || !data.result) {\n        throw new Error(data.message || 'Failed to fetch task statistics');\n      }\n      \n      return data.result;\n    },\n  });\n\n  if (isLoading) {\n    return (\n      \u003cContainer className=\"mt-4 text-center\"\u003e\n        \u003cSpinner animation=\"border\" role=\"status\"\u003e\n          \u003cspan className=\"visually-hidden\"\u003eLoading...\u003c/span\u003e\n        \u003c/Spinner\u003e\n      \u003c/Container\u003e\n    );\n  }\n\n  if (error || !data) {\n    return (\n      \u003cContainer className=\"mt-4\"\u003e\n        \u003cAlert variant=\"danger\"\u003e\n          Error loading task statistics: {error?.message || 'Unknown error'}\n        \u003c/Alert\u003e\n      \u003c/Container\u003e\n    );\n  }\n\n  const getStatusVariant = (status: string): string =\u003e {\n    switch (status) {\n      case 'done': return 'success';\n      case 'in_progress': return 'primary';\n      case 'todo': return 'warning';\n      default: return 'secondary';\n    }\n  };\n\n  const getPriorityLabel = (priority: number): string =\u003e {\n    switch (priority) {\n      case 1: return 'Low';\n      case 2: return 'Medium';\n      case 3: return 'High';\n      default: return `Priority ${priority}`;\n    }\n  };\n\n  const getPriorityVariant = (priority: number): string =\u003e {\n    switch (priority) {\n      case 1: return 'info';\n      case 2: return 'warning';\n      case 3: return 'danger';\n      default: return 'secondary';\n    }\n  };\n\n  const formatDate = (dateString: string): string =\u003e {\n    const date = new Date(dateString);\n    return date.toLocaleDateString();\n  };\n\n  return (\n    \u003cContainer className=\"mt-4\"\u003e\n      \u003ch1 className=\"mb-4\"\u003eTask Statistics Dashboard\u003c/h1\u003e\n      \n      \u003cRow className=\"mb-4\"\u003e\n        \u003cCol\u003e\n          \u003cCard className=\"text-center h-100\"\u003e\n            \u003cCard.Body\u003e\n              \u003cCard.Title\u003eTotal Tasks\u003c/Card.Title\u003e\n              \u003ch2\u003e{data.totalTasks}\u003c/h2\u003e\n            \u003c/Card.Body\u003e\n          \u003c/Card\u003e\n        \u003c/Col\u003e\n      \u003c/Row\u003e\n      \n      \u003cRow className=\"mb-4\"\u003e\n        \u003cCol md={6}\u003e\n          \u003cCard className=\"h-100\"\u003e\n            \u003cCard.Header\u003eTasks by Status\u003c/Card.Header\u003e\n            \u003cCard.Body\u003e\n              {data.statusCounts.map(item =\u003e (\n                \u003cdiv key={item.status} className=\"d-flex justify-content-between align-items-center mb-2\"\u003e\n                  \u003cdiv\u003e\n                    \u003cBadge bg={getStatusVariant(item.status)} className=\"me-2\"\u003e\n                      {item.status.replace('_', ' ')}\n                    \u003c/Badge\u003e\n                  \u003c/div\u003e\n                  \u003cdiv\u003e\n                    \u003cstrong\u003e{item.count}\u003c/strong\u003e tasks\n                  \u003c/div\u003e\n                \u003c/div\u003e\n              ))}\n            \u003c/Card.Body\u003e\n          \u003c/Card\u003e\n        \u003c/Col\u003e\n        \n        \u003cCol md={6}\u003e\n          \u003cCard className=\"h-100\"\u003e\n            \u003cCard.Header\u003eTasks by Priority\u003c/Card.Header\u003e\n            \u003cCard.Body\u003e\n              {data.priorityCounts.map(item =\u003e (\n                \u003cdiv key={item.priority} className=\"d-flex justify-content-between align-items-center mb-2\"\u003e\n                  \u003cdiv\u003e\n                    \u003cBadge bg={getPriorityVariant(item.priority)} className=\"me-2\"\u003e\n                      {getPriorityLabel(item.priority)}\n                    \u003c/Badge\u003e\n                  \u003c/div\u003e\n                  \u003cdiv\u003e\n                    \u003cstrong\u003e{item.count}\u003c/strong\u003e tasks\n                  \u003c/div\u003e\n                \u003c/div\u003e\n              ))}\n            \u003c/Card.Body\u003e\n          \u003c/Card\u003e\n        \u003c/Col\u003e\n      \u003c/Row\u003e\n      \n      \u003cRow\u003e\n        \u003cCol\u003e\n          \u003cCard\u003e\n            \u003cCard.Header\u003eUpcoming Tasks\u003c/Card.Header\u003e\n            \u003cListGroup variant=\"flush\"\u003e\n              {data.upcomingTasks.length \u003e 0 ? (\n                data.upcomingTasks.map(task =\u003e (\n                  \u003cListGroup.Item key={task.id} className=\"d-flex justify-content-between align-items-center\"\u003e\n                    \u003cdiv\u003e\n                      \u003cBadge bg={getStatusVariant(task.status)} className=\"me-2\"\u003e\n                        {task.status.replace('_', ' ')}\n                      \u003c/Badge\u003e\n                      {task.title}\n                    \u003c/div\u003e\n                    \u003cBadge bg=\"secondary\"\u003e\n                      Due: {formatDate(task.due_date)}\n                    \u003c/Badge\u003e\n                  \u003c/ListGroup.Item\u003e\n                ))\n              ) : (\n                \u003cListGroup.Item\u003eNo upcoming tasks\u003c/ListGroup.Item\u003e\n              )}\n            \u003c/ListGroup\u003e\n          \u003c/Card\u003e\n        \u003c/Col\u003e\n      \u003c/Row\u003e\n    \u003c/Container\u003e\n  );\n}\n"
+  },
+  "serverOperations": [
+    {
+      "name": "get-task-statistics",
+      "javascriptCode": "function run() {\n  // Get counts by status\n  const statusCounts = query(`\n    SELECT status, COUNT(*) as count \n    FROM tasks \n    WHERE deleted_at IS NULL \n    GROUP BY status\n  `);\n  \n  // Get counts by priority\n  const priorityCounts = query(`\n    SELECT priority, COUNT(*) as count \n    FROM tasks \n    WHERE deleted_at IS NULL \n    GROUP BY priority\n    ORDER BY priority\n  `);\n  \n  // Get upcoming tasks (due in the next 7 days)\n  const upcomingTasks = query(`\n    SELECT id, title, due_date, status\n    FROM tasks\n    WHERE deleted_at IS NULL\n      AND due_date IS NOT NULL\n      AND due_date \u003e datetime('now')\n      AND due_date \u003c= datetime('now', '+7 days')\n    ORDER BY due_date ASC\n    LIMIT 5\n  `);\n  \n  // Get total task count\n  const totalTasks = query(`\n    SELECT COUNT(*) as count\n    FROM tasks\n    WHERE deleted_at IS NULL\n  `);\n  \n  // Format the results\n  const formattedStatusCounts = statusCounts.map(row =\u003e ({\n    status: row[0],\n    count: row[1]\n  }));\n  \n  const formattedPriorityCounts = priorityCounts.map(row =\u003e ({\n    priority: row[0],\n    count: row[1]\n  }));\n  \n  const formattedUpcomingTasks = upcomingTasks.map(row =\u003e ({\n    id: row[0],\n    title: row[1],\n    due_date: row[2],\n    status: row[3]\n  }));\n  \n  return {\n    statusCounts: formattedStatusCounts,\n    priorityCounts: formattedPriorityCounts,\n    upcomingTasks: formattedUpcomingTasks,\n    totalTasks: totalTasks[0][0]\n  };\n}",
+      "parameters": {},
+      "return": {
+        "type": "object",
+        "spec": {
+          "nullable": false,
+          "properties": {
+            "priorityCounts": {
+              "type": "array",
+              "spec": {
+                "nullable": false,
+                "items": {
+                  "type": "object",
+                  "spec": {
+                    "nullable": false,
+                    "properties": {
+                      "count": {
+                        "type": "number",
+                        "spec": {
+                          "nullable": false
+                        }
+                      },
+                      "priority": {
+                        "type": "number",
+                        "spec": {
+                          "nullable": false
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "statusCounts": {
+              "type": "array",
+              "spec": {
+                "nullable": false,
+                "items": {
+                  "type": "object",
+                  "spec": {
+                    "nullable": false,
+                    "properties": {
+                      "count": {
+                        "type": "number",
+                        "spec": {
+                          "nullable": false
+                        }
+                      },
+                      "status": {
+                        "type": "string",
+                        "spec": {
+                          "nullable": false
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "totalTasks": {
+              "type": "number",
+              "spec": {
+                "nullable": false
+              }
+            },
+            "upcomingTasks": {
+              "type": "array",
+              "spec": {
+                "nullable": false,
+                "items": {
+                  "type": "object",
+                  "spec": {
+                    "nullable": false,
+                    "properties": {
+                      "due_date": {
+                        "type": "string",
+                        "spec": {
+                          "nullable": false
+                        }
+                      },
+                      "id": {
+                        "type": "number",
+                        "spec": {
+                          "nullable": false
+                        }
+                      },
+                      "status": {
+                        "type": "string",
+                        "spec": {
+                          "nullable": false
+                        }
+                      },
+                      "title": {
+                        "type": "string",
+                        "spec": {
+                          "nullable": false
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

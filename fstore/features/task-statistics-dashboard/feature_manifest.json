@@ -1,0 +1,8 @@
+{
+  "name": "task-statistics-dashboard",
+  "label": "Task Statistics Dashboard",
+  "description": "A dashboard showing key statistics about tasks including counts by status, priority distribution, and upcoming due dates.",
+  "operations": [
+    "get-task-statistics"
+  ]
+}

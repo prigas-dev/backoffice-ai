@@ -1,6 +1,11 @@
 {
   "name": "kanban-board",
-  "label": "Kanban",
-  "description": "Kanban board to do stuff",
-  "operations": ["get-all-tasks", "update-task-status"]
+  "label": "Kanban Board",
+  "description": "A kanban board to visualize, create, and manage tasks with filtering capabilities by user and status.",
+  "operations": [
+    "get-tasks",
+    "get-users",
+    "create-task",
+    "update-task-status"
+  ]
 }

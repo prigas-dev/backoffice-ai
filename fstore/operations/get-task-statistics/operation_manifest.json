@@ -1,0 +1,108 @@
+{
+  "name": "get-task-statistics",
+  "parameters": {},
+  "return": {
+    "type": "object",
+    "spec": {
+      "nullable": false,
+      "properties": {
+        "priorityCounts": {
+          "type": "array",
+          "spec": {
+            "nullable": false,
+            "items": {
+              "type": "object",
+              "spec": {
+                "nullable": false,
+                "properties": {
+                  "count": {
+                    "type": "number",
+                    "spec": {
+                      "nullable": false
+                    }
+                  },
+                  "priority": {
+                    "type": "number",
+                    "spec": {
+                      "nullable": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "statusCounts": {
+          "type": "array",
+          "spec": {
+            "nullable": false,
+            "items": {
+              "type": "object",
+              "spec": {
+                "nullable": false,
+                "properties": {
+                  "count": {
+                    "type": "number",
+                    "spec": {
+                      "nullable": false
+                    }
+                  },
+                  "status": {
+                    "type": "string",
+                    "spec": {
+                      "nullable": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "totalTasks": {
+          "type": "number",
+          "spec": {
+            "nullable": false
+          }
+        },
+        "upcomingTasks": {
+          "type": "array",
+          "spec": {
+            "nullable": false,
+            "items": {
+              "type": "object",
+              "spec": {
+                "nullable": false,
+                "properties": {
+                  "due_date": {
+                    "type": "string",
+                    "spec": {
+                      "nullable": false
+                    }
+                  },
+                  "id": {
+                    "type": "number",
+                    "spec": {
+                      "nullable": false
+                    }
+                  },
+                  "status": {
+                    "type": "string",
+                    "spec": {
+                      "nullable": false
+                    }
+                  },
+                  "title": {
+                    "type": "string",
+                    "spec": {
+                      "nullable": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

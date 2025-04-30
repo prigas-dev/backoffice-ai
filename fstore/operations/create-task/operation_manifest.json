@@ -1,16 +1,40 @@
 {
-  "name": "update-task-status",
+  "name": "create-task",
   "parameters": {
-    "status": {
+    "description": {
       "type": "string",
       "spec": {
         "nullable": false
       }
     },
-    "task_id": {
+    "due_date": {
+      "type": "string",
+      "spec": {
+        "nullable": true
+      }
+    },
+    "priority": {
       "type": "number",
       "spec": {
         "nullable": false
+      }
+    },
+    "title": {
+      "type": "string",
+      "spec": {
+        "nullable": false
+      }
+    },
+    "user_ids": {
+      "type": "array",
+      "spec": {
+        "nullable": false,
+        "items": {
+          "type": "number",
+          "spec": {
+            "nullable": false
+          }
+        }
       }
     }
   },
@@ -19,12 +43,6 @@
     "spec": {
       "nullable": false,
       "properties": {
-        "status": {
-          "type": "string",
-          "spec": {
-            "nullable": false
-          }
-        },
         "success": {
           "type": "boolean",
           "spec": {

@@ -1,0 +1,256 @@
+{
+  "name": "kanban-board",
+  "label": "Kanban Board",
+  "description": "A kanban board to visualize, create, and manage tasks with filtering capabilities by user and status.",
+  "reactComponent": {
+    "tsxCode": "import React, { useState } from 'react';\nimport { Card, Button, Container, Row, Col, Form, Badge, Modal, Spinner, Dropdown } from 'react-bootstrap';\nimport { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';\nimport { useForm } from 'react-hook-form';\n\n// Types\ntype Task = {\n  id: number;\n  title: string;\n  description: string;\n  status: 'todo' | 'in_progress' | 'done';\n  priority: number;\n  due_date: string | null;\n  users: User[];\n};\n\ntype User = {\n  id: number;\n  name: string;\n  email: string;\n};\n\ntype Category = {\n  id: number;\n  name: string;\n};\n\n// Main Component\nexport default function Component() {\n  const [showNewTaskModal, setShowNewTaskModal] = useState(false);\n  const [statusFilter, setStatusFilter] = useState\u003cstring | null\u003e(null);\n  const [userFilter, setUserFilter] = useState\u003cnumber | null\u003e(null);\n  \n  const { data: tasks, isLoading: tasksLoading } = useGetTasks();\n  const { data: users, isLoading: usersLoading } = useGetUsers();\n  \n  const handleCloseNewTaskModal = () =\u003e setShowNewTaskModal(false);\n  const handleShowNewTaskModal = () =\u003e setShowNewTaskModal(true);\n  \n  // Filter tasks based on selected filters\n  const filteredTasks = tasks?.filter(task =\u003e {\n    // Apply status filter if set\n    if (statusFilter \u0026\u0026 task.status !== statusFilter) {\n      return false;\n    }\n    \n    // Apply user filter if set\n    if (userFilter \u0026\u0026 !task.users.some(user =\u003e user.id === userFilter)) {\n      return false;\n    }\n    \n    return true;\n  });\n  \n  // Group tasks by status\n  const todoTasks = filteredTasks?.filter(task =\u003e task.status === 'todo') || [];\n  const inProgressTasks = filteredTasks?.filter(task =\u003e task.status === 'in_progress') || [];\n  const doneTasks = filteredTasks?.filter(task =\u003e task.status === 'done') || [];\n  \n  if (tasksLoading || usersLoading) {\n    return (\n      \u003cdiv className=\"d-flex justify-content-center align-items-center\" style={{ height: '100vh' }}\u003e\n        \u003cSpinner animation=\"border\" /\u003e\n      \u003c/div\u003e\n    );\n  }\n  \n  return (\n    \u003cContainer fluid className=\"p-4\"\u003e\n      \u003cRow className=\"mb-4\"\u003e\n        \u003cCol\u003e\n          \u003ch1\u003eKanban Board\u003c/h1\u003e\n        \u003c/Col\u003e\n        \u003cCol xs=\"auto\" className=\"d-flex align-items-center\"\u003e\n          \u003cButton variant=\"primary\" onClick={handleShowNewTaskModal} className=\"me-2\"\u003e\n            New Task\n          \u003c/Button\u003e\n          \n          \u003cForm.Group className=\"me-2\" style={{ width: '200px' }}\u003e\n            \u003cForm.Select \n              value={statusFilter || ''} \n              onChange={(e) =\u003e setStatusFilter(e.target.value || null)}\n            \u003e\n              \u003coption value=\"\"\u003eAll Statuses\u003c/option\u003e\n              \u003coption value=\"todo\"\u003eTo Do\u003c/option\u003e\n              \u003coption value=\"in_progress\"\u003eIn Progress\u003c/option\u003e\n              \u003coption value=\"done\"\u003eDone\u003c/option\u003e\n            \u003c/Form.Select\u003e\n          \u003c/Form.Group\u003e\n          \n          \u003cForm.Group style={{ width: '200px' }}\u003e\n            \u003cForm.Select \n              value={userFilter || ''} \n              onChange={(e) =\u003e setUserFilter(e.target.value ? Number(e.target.value) : null)}\n            \u003e\n              \u003coption value=\"\"\u003eAll Users\u003c/option\u003e\n              {users?.map(user =\u003e (\n                \u003coption key={user.id} value={user.id}\u003e{user.name}\u003c/option\u003e\n              ))}\n            \u003c/Form.Select\u003e\n          \u003c/Form.Group\u003e\n        \u003c/Col\u003e\n      \u003c/Row\u003e\n      \n      \u003cRow\u003e\n        \u003cCol md={4}\u003e\n          \u003cKanbanColumn \n            title=\"To Do\" \n            tasks={todoTasks} \n            users={users || []} \n            status=\"todo\" \n          /\u003e\n        \u003c/Col\u003e\n        \u003cCol md={4}\u003e\n          \u003cKanbanColumn \n            title=\"In Progress\" \n            tasks={inProgressTasks} \n            users={users || []} \n            status=\"in_progress\" \n          /\u003e\n        \u003c/Col\u003e\n        \u003cCol md={4}\u003e\n          \u003cKanbanColumn \n            title=\"Done\" \n            tasks={doneTasks} \n            users={users || []} \n            status=\"done\" \n          /\u003e\n        \u003c/Col\u003e\n      \u003c/Row\u003e\n      \n      {/* New Task Modal */}\n      \u003cModal show={showNewTaskModal} onHide={handleCloseNewTaskModal} size=\"lg\"\u003e\n        \u003cModal.Header closeButton\u003e\n          \u003cModal.Title\u003eCreate New Task\u003c/Modal.Title\u003e\n        \u003c/Modal.Header\u003e\n        \u003cModal.Body\u003e\n          \u003cTaskForm users={users || []} onSuccess={handleCloseNewTaskModal} /\u003e\n        \u003c/Modal.Body\u003e\n      \u003c/Modal\u003e\n    \u003c/Container\u003e\n  );\n}\n\n// Kanban Column Component\nfunction KanbanColumn({ \n  title, \n  tasks, \n  users,\n  status \n}: { \n  title: string; \n  tasks: Task[]; \n  users: User[];\n  status: 'todo' | 'in_progress' | 'done';\n}) {\n  return (\n    \u003cdiv className=\"kanban-column\"\u003e\n      \u003ch4 className=\"mb-3\"\u003e{title} ({tasks.length})\u003c/h4\u003e\n      \u003cdiv \n        className=\"p-2\" \n        style={{ \n          backgroundColor: '#f5f5f5', \n          borderRadius: '5px',\n          minHeight: '500px'\n        }}\n      \u003e\n        {tasks.map(task =\u003e (\n          \u003cTaskCard \n            key={task.id} \n            task={task} \n            users={users} \n          /\u003e\n        ))}\n      \u003c/div\u003e\n    \u003c/div\u003e\n  );\n}\n\n// Task Card Component\nfunction TaskCard({ task, users }: { task: Task; users: User[] }) {\n  const [showTaskModal, setShowTaskModal] = useState(false);\n  const { mutate: updateTaskStatus } = useUpdateTaskStatus();\n  \n  const handleCloseTaskModal = () =\u003e setShowTaskModal(false);\n  const handleShowTaskModal = () =\u003e setShowTaskModal(true);\n  \n  const handleMoveTask = (newStatus: 'todo' | 'in_progress' | 'done') =\u003e {\n    updateTaskStatus({ taskId: task.id, status: newStatus });\n  };\n  \n  // Format due date if exists\n  const formattedDueDate = task.due_date ? new Date(task.due_date).toLocaleDateString() : 'No due date';\n  \n  // Priority badge color\n  const getPriorityBadge = (priority: number) =\u003e {\n    switch(priority) {\n      case 1: return 'danger';\n      case 2: return 'warning';\n      case 3: return 'info';\n      default: return 'secondary';\n    }\n  };\n  \n  return (\n    \u003c\u003e\n      \u003cCard className=\"mb-2 task-card\" onClick={handleShowTaskModal}\u003e\n        \u003cCard.Body\u003e\n          \u003cCard.Title\u003e{task.title}\u003c/Card.Title\u003e\n          \u003cCard.Text className=\"text-truncate\"\u003e{task.description}\u003c/Card.Text\u003e\n          \u003cdiv className=\"d-flex justify-content-between align-items-center\"\u003e\n            \u003cBadge bg={getPriorityBadge(task.priority)}\u003e\n              Priority: {task.priority}\n            \u003c/Badge\u003e\n            \u003csmall className=\"text-muted\"\u003e{formattedDueDate}\u003c/small\u003e\n          \u003c/div\u003e\n          {task.users.length \u003e 0 \u0026\u0026 (\n            \u003cdiv className=\"mt-2\"\u003e\n              \u003csmall\u003eAssigned to: {task.users.map(user =\u003e user.name).join(', ')}\u003c/small\u003e\n            \u003c/div\u003e\n          )}\n        \u003c/Card.Body\u003e\n      \u003c/Card\u003e\n      \n      {/* Task Detail Modal */}\n      \u003cModal show={showTaskModal} onHide={handleCloseTaskModal}\u003e\n        \u003cModal.Header closeButton\u003e\n          \u003cModal.Title\u003e{task.title}\u003c/Modal.Title\u003e\n        \u003c/Modal.Header\u003e\n        \u003cModal.Body\u003e\n          \u003cp\u003e\u003cstrong\u003eDescription:\u003c/strong\u003e {task.description}\u003c/p\u003e\n          \u003cp\u003e\u003cstrong\u003eStatus:\u003c/strong\u003e {task.status.replace('_', ' ')}\u003c/p\u003e\n          \u003cp\u003e\u003cstrong\u003ePriority:\u003c/strong\u003e {task.priority}\u003c/p\u003e\n          \u003cp\u003e\u003cstrong\u003eDue Date:\u003c/strong\u003e {formattedDueDate}\u003c/p\u003e\n          \u003cp\u003e\n            \u003cstrong\u003eAssigned to:\u003c/strong\u003e {task.users.length \u003e 0 \n              ? task.users.map(user =\u003e user.name).join(', ')\n              : 'Unassigned'}\n          \u003c/p\u003e\n        \u003c/Modal.Body\u003e\n        \u003cModal.Footer\u003e\n          \u003cDropdown\u003e\n            \u003cDropdown.Toggle variant=\"primary\" id=\"dropdown-move\"\u003e\n              Move Task\n            \u003c/Dropdown.Toggle\u003e\n            \u003cDropdown.Menu\u003e\n              \u003cDropdown.Item \n                onClick={() =\u003e handleMoveTask('todo')} \n                disabled={task.status === 'todo'}\n              \u003e\n                To Do\n              \u003c/Dropdown.Item\u003e\n              \u003cDropdown.Item \n                onClick={() =\u003e handleMoveTask('in_progress')} \n                disabled={task.status === 'in_progress'}\n              \u003e\n                In Progress\n              \u003c/Dropdown.Item\u003e\n              \u003cDropdown.Item \n                onClick={() =\u003e handleMoveTask('done')} \n                disabled={task.status === 'done'}\n              \u003e\n                Done\n              \u003c/Dropdown.Item\u003e\n            \u003c/Dropdown.Menu\u003e\n          \u003c/Dropdown\u003e\n          \u003cButton variant=\"secondary\" onClick={handleCloseTaskModal}\u003e\n            Close\n          \u003c/Button\u003e\n        \u003c/Modal.Footer\u003e\n      \u003c/Modal\u003e\n    \u003c/\u003e\n  );\n}\n\n// Task Form Component\nfunction TaskForm({ users, onSuccess }: { users: User[], onSuccess: () =\u003e void }) {\n  const { register, handleSubmit, formState: { errors }, reset } = useForm\u003c{\n    title: string;\n    description: string;\n    priority: number;\n    due_date: string;\n    user_ids: number[];\n  }\u003e();\n  \n  const { mutate: createTask, isPending } = useCreateTask();\n  \n  const onSubmit = (data: any) =\u003e {\n    // Convert user_ids to array if it's a single value\n    const user_ids = Array.isArray(data.user_ids) \n      ? data.user_ids.map(Number) \n      : data.user_ids \n        ? [Number(data.user_ids)] \n        : [];\n    \n    createTask({\n      ...data,\n      priority: Number(data.priority),\n      user_ids\n    }, {\n      onSuccess: () =\u003e {\n        reset();\n        onSuccess();\n      }\n    });\n  };\n  \n  return (\n    \u003cForm onSubmit={handleSubmit(onSubmit)}\u003e\n      \u003cForm.Group className=\"mb-3\"\u003e\n        \u003cForm.Label\u003eTitle\u003c/Form.Label\u003e\n        \u003cForm.Control \n          type=\"text\" \n          {...register('title', { required: 'Title is required' })} \n          isInvalid={!!errors.title}\n        /\u003e\n        {errors.title \u0026\u0026 (\n          \u003cForm.Control.Feedback type=\"invalid\"\u003e\n            {errors.title.message}\n          \u003c/Form.Control.Feedback\u003e\n        )}\n      \u003c/Form.Group\u003e\n      \n      \u003cForm.Group className=\"mb-3\"\u003e\n        \u003cForm.Label\u003eDescription\u003c/Form.Label\u003e\n        \u003cForm.Control \n          as=\"textarea\" \n          rows={3} \n          {...register('description')} \n        /\u003e\n      \u003c/Form.Group\u003e\n      \n      \u003cForm.Group className=\"mb-3\"\u003e\n        \u003cForm.Label\u003ePriority (1-High, 2-Medium, 3-Low)\u003c/Form.Label\u003e\n        \u003cForm.Select \n          {...register('priority', { required: 'Priority is required' })} \n          isInvalid={!!errors.priority}\n        \u003e\n          \u003coption value=\"1\"\u003eHigh\u003c/option\u003e\n          \u003coption value=\"2\"\u003eMedium\u003c/option\u003e\n          \u003coption value=\"3\"\u003eLow\u003c/option\u003e\n        \u003c/Form.Select\u003e\n        {errors.priority \u0026\u0026 (\n          \u003cForm.Control.Feedback type=\"invalid\"\u003e\n            {errors.priority.message}\n          \u003c/Form.Control.Feedback\u003e\n        )}\n      \u003c/Form.Group\u003e\n      \n      \u003cForm.Group className=\"mb-3\"\u003e\n        \u003cForm.Label\u003eDue Date\u003c/Form.Label\u003e\n        \u003cForm.Control \n          type=\"date\" \n          {...register('due_date')} \n        /\u003e\n      \u003c/Form.Group\u003e\n      \n      \u003cForm.Group className=\"mb-3\"\u003e\n        \u003cForm.Label\u003eAssign Users\u003c/Form.Label\u003e\n        \u003cForm.Select \n          multiple \n          {...register('user_ids')} \n        \u003e\n          {users.map(user =\u003e (\n            \u003coption key={user.id} value={user.id}\u003e{user.name}\u003c/option\u003e\n          ))}\n        \u003c/Form.Select\u003e\n      \u003c/Form.Group\u003e\n      \n      \u003cButton variant=\"primary\" type=\"submit\" disabled={isPending}\u003e\n        {isPending ? (\n          \u003c\u003e\n            \u003cSpinner as=\"span\" animation=\"border\" size=\"sm\" className=\"me-2\" /\u003e\n            Creating...\n          \u003c/\u003e\n        ) : 'Create Task'}\n      \u003c/Button\u003e\n    \u003c/Form\u003e\n  );\n}\n\n// API Hooks\nfunction useGetTasks() {\n  return useQuery({\n    queryKey: ['tasks'],\n    queryFn: async () =\u003e {\n      const response = await fetch('/operations/execute/get-tasks', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify({ parameters: {} }),\n      });\n      \n      const data = await response.json();\n      if (!data.success) {\n        throw new Error(data.message);\n      }\n      \n      return data.result.tasks;\n    },\n  });\n}\n\nfunction useGetUsers() {\n  return useQuery({\n    queryKey: ['users'],\n    queryFn: async () =\u003e {\n      const response = await fetch('/operations/execute/get-users', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify({ parameters: {} }),\n      });\n      \n      const data = await response.json();\n      if (!data.success) {\n        throw new Error(data.message);\n      }\n      \n      return data.result.users;\n    },\n  });\n}\n\nfunction useCreateTask() {\n  const queryClient = useQueryClient();\n  \n  return useMutation({\n    mutationFn: async (taskData: {\n      title: string;\n      description: string;\n      priority: number;\n      due_date?: string;\n      user_ids: number[];\n    }) =\u003e {\n      const response = await fetch('/operations/execute/create-task', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify({ parameters: taskData }),\n      });\n      \n      const data = await response.json();\n      if (!data.success) {\n        throw new Error(data.message);\n      }\n      \n      return data.result;\n    },\n    onSuccess: () =\u003e {\n      queryClient.invalidateQueries({ queryKey: ['tasks'] });\n    },\n  });\n}\n\nfunction useUpdateTaskStatus() {\n  const queryClient = useQueryClient();\n  \n  return useMutation({\n    mutationFn: async ({ taskId, status }: { taskId: number; status: string }) =\u003e {\n      const response = await fetch('/operations/execute/update-task-status', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify({ \n          parameters: { \n            task_id: taskId, \n            status \n          } \n        }),\n      });\n      \n      const data = await response.json();\n      if (!data.success) {\n        throw new Error(data.message);\n      }\n      \n      return data.result;\n    },\n    onSuccess: () =\u003e {\n      queryClient.invalidateQueries({ queryKey: ['tasks'] });\n    },\n  });\n}\n"
+  },
+  "serverOperations": [
+    {
+      "name": "get-tasks",
+      "javascriptCode": "function run() {\n  // Get all tasks with their details\n  const tasks = query(`\n    SELECT \n      t.id, \n      t.title, \n      t.description, \n      t.status, \n      t.priority, \n      t.due_date\n    FROM tasks t\n    WHERE t.deleted_at IS NULL\n    ORDER BY t.priority ASC, t.due_date ASC\n  `);\n  \n  // Create an array to hold the full task objects\n  const tasksWithUsers = [];\n  \n  // For each task, get the assigned users\n  for (const task of tasks) {\n    const [id, title, description, status, priority, due_date] = task;\n    \n    // Get users assigned to this task\n    const taskUsers = query(`\n      SELECT u.id, u.name, u.email\n      FROM users u\n      JOIN user_tasks ut ON u.id = ut.user_id\n      WHERE ut.task_id = ? AND u.deleted_at IS NULL\n    `, id);\n    \n    // Format users array\n    const users = taskUsers.map(user =\u003e ({\n      id: user[0],\n      name: user[1],\n      email: user[2]\n    }));\n    \n    // Add the task with its users to the result array\n    tasksWithUsers.push({\n      id,\n      title,\n      description,\n      status,\n      priority,\n      due_date,\n      users\n    });\n  }\n  \n  return { tasks: tasksWithUsers };\n}",
+      "parameters": {},
+      "return": {
+        "type": "object",
+        "spec": {
+          "nullable": false,
+          "properties": {
+            "tasks": {
+              "type": "array",
+              "spec": {
+                "nullable": false,
+                "items": {
+                  "type": "object",
+                  "spec": {
+                    "nullable": false,
+                    "properties": {
+                      "description": {
+                        "type": "string",
+                        "spec": {
+                          "nullable": false
+                        }
+                      },
+                      "due_date": {
+                        "type": "string",
+                        "spec": {
+                          "nullable": true
+                        }
+                      },
+                      "id": {
+                        "type": "number",
+                        "spec": {
+                          "nullable": false
+                        }
+                      },
+                      "priority": {
+                        "type": "number",
+                        "spec": {
+                          "nullable": false
+                        }
+                      },
+                      "status": {
+                        "type": "string",
+                        "spec": {
+                          "nullable": false
+                        }
+                      },
+                      "title": {
+                        "type": "string",
+                        "spec": {
+                          "nullable": false
+                        }
+                      },
+                      "users": {
+                        "type": "array",
+                        "spec": {
+                          "nullable": false,
+                          "items": {
+                            "type": "object",
+                            "spec": {
+                              "nullable": false,
+                              "properties": {
+                                "email": {
+                                  "type": "string",
+                                  "spec": {
+                                    "nullable": false
+                                  }
+                                },
+                                "id": {
+                                  "type": "number",
+                                  "spec": {
+                                    "nullable": false
+                                  }
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "spec": {
+                                    "nullable": false
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "get-users",
+      "javascriptCode": "function run() {\n  // Get all active users\n  const users = query(`\n    SELECT id, name, email\n    FROM users\n    WHERE deleted_at IS NULL\n    ORDER BY name ASC\n  `);\n  \n  // Format the users array\n  const formattedUsers = users.map(user =\u003e ({\n    id: user[0],\n    name: user[1],\n    email: user[2]\n  }));\n  \n  return { users: formattedUsers };\n}",
+      "parameters": {},
+      "return": {
+        "type": "object",
+        "spec": {
+          "nullable": false,
+          "properties": {
+            "users": {
+              "type": "array",
+              "spec": {
+                "nullable": false,
+                "items": {
+                  "type": "object",
+                  "spec": {
+                    "nullable": false,
+                    "properties": {
+                      "email": {
+                        "type": "string",
+                        "spec": {
+                          "nullable": false
+                        }
+                      },
+                      "id": {
+                        "type": "number",
+                        "spec": {
+                          "nullable": false
+                        }
+                      },
+                      "name": {
+                        "type": "string",
+                        "spec": {
+                          "nullable": false
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "create-task",
+      "javascriptCode": "function run({ title, description, priority, due_date, user_ids }) {\n  // Get current timestamp\n  const now = new Date().toISOString();\n  \n  // Insert new task\n  const taskResult = query(`\n    INSERT INTO tasks (title, description, status, priority, due_date, created_at, updated_at)\n    VALUES (?, ?, 'todo', ?, ?, ?, ?)\n    RETURNING id\n  `, title, description, priority, due_date || null, now, now);\n  \n  if (!taskResult || taskResult.length === 0) {\n    throw new Error('Failed to create task');\n  }\n  \n  const taskId = taskResult[0][0];\n  \n  // Assign users to the task if provided\n  if (user_ids \u0026\u0026 user_ids.length \u003e 0) {\n    for (const userId of user_ids) {\n      try {\n        query(`\n          INSERT INTO user_tasks (user_id, task_id)\n          VALUES (?, ?)\n        `, userId, taskId);\n      } catch (error) {\n        // Log error but continue with other users\n        console.error(`Failed to assign user ${userId} to task ${taskId}:`, error);\n      }\n    }\n  }\n  \n  return { \n    success: true,\n    task_id: taskId\n  };\n}",
+      "parameters": {
+        "description": {
+          "type": "string",
+          "spec": {
+            "nullable": false
+          }
+        },
+        "due_date": {
+          "type": "string",
+          "spec": {
+            "nullable": true
+          }
+        },
+        "priority": {
+          "type": "number",
+          "spec": {
+            "nullable": false
+          }
+        },
+        "title": {
+          "type": "string",
+          "spec": {
+            "nullable": false
+          }
+        },
+        "user_ids": {
+          "type": "array",
+          "spec": {
+            "nullable": false,
+            "items": {
+              "type": "number",
+              "spec": {
+                "nullable": false
+              }
+            }
+          }
+        }
+      },
+      "return": {
+        "type": "object",
+        "spec": {
+          "nullable": false,
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "spec": {
+                "nullable": false
+              }
+            },
+            "task_id": {
+              "type": "number",
+              "spec": {
+                "nullable": false
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "update-task-status",
+      "javascriptCode": "function run({ task_id, status }) {\n  // Validate status\n  const validStatuses = ['todo', 'in_progress', 'done'];\n  if (!validStatuses.includes(status)) {\n    throw new Error(`Invalid status: ${status}. Must be one of: ${validStatuses.join(', ')}`);\n  }\n  \n  // Get current timestamp\n  const now = new Date().toISOString();\n  \n  // Update task status\n  const result = query(`\n    UPDATE tasks\n    SET status = ?, updated_at = ?\n    WHERE id = ? AND deleted_at IS NULL\n    RETURNING id\n  `, status, now, task_id);\n  \n  if (!result || result.length === 0) {\n    throw new Error(`Task with ID ${task_id} not found or could not be updated`);\n  }\n  \n  return { \n    success: true,\n    task_id: result[0][0],\n    status\n  };\n}",
+      "parameters": {
+        "status": {
+          "type": "string",
+          "spec": {
+            "nullable": false
+          }
+        },
+        "task_id": {
+          "type": "number",
+          "spec": {
+            "nullable": false
+          }
+        }
+      },
+      "return": {
+        "type": "object",
+        "spec": {
+          "nullable": false,
+          "properties": {
+            "status": {
+              "type": "string",
+              "spec": {
+                "nullable": false
+              }
+            },
+            "success": {
+              "type": "boolean",
+              "spec": {
+                "nullable": false
+              }
+            },
+            "task_id": {
+              "type": "number",
+              "spec": {
+                "nullable": false
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
