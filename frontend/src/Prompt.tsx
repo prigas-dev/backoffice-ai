@@ -1,25 +1,100 @@
+import { useLocation } from "@tanstack/react-router";
 import { useState } from "react";
-import { Button, Col, Container, Form, Row, Spinner } from "react-bootstrap";
+import { Button, Card, Col, Form, Row, Spinner } from "react-bootstrap";
 import { useForm } from "react-hook-form";
 
 type Feature = {
   name: string;
 };
-export function Prompt() {
+interface PromptProps {
+  promptInstructions?: string;
+}
+export function Prompt({ promptInstructions }: PromptProps) {
+  const currentFeatureName = useCurrentFeatureName();
+
   function onFeatureCreated(feature: Feature) {
-    location.href = `/feature/${feature.name}`;
+    if (feature.name === currentFeatureName) {
+      location.reload();
+    } else {
+      location.href = `/feature/${feature.name}`;
+    }
   }
   return (
-    <Container>
-      <CreateViewForm onFeatureCreated={onFeatureCreated} />
-    </Container>
+    <CreateViewForm
+      currentFeatureName={currentFeatureName}
+      onFeatureCreated={onFeatureCreated}
+      promptInstructions={promptInstructions}
+    />
   );
 }
 
-interface CreateViewFormProps {
-  onFeatureCreated(feature: any): void;
+export function PromptCornerButton() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const currentFeatureName = useCurrentFeatureName();
+
+  if (currentFeatureName == null) {
+    return null;
+  }
+
+  return (
+    <div
+      style={{ zIndex: 1 }}
+      className="position-fixed bottom-0 end-0 d-flex flex-column align-items-end m-4"
+    >
+      {isOpen && (
+        <Card className="mb-2 shadow">
+          <Card.Body className="">
+            <Prompt />
+          </Card.Body>
+        </Card>
+      )}
+
+      <Button
+        variant="primary"
+        className="rounded-circle d-flex align-items-center justify-content-center"
+        style={{ width: "3rem", height: "3rem" }}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        {isOpen ? (
+          <i className="bi-dash-lg"></i>
+        ) : (
+          <i className="bi-plus-lg"></i>
+        )}
+      </Button>
+    </div>
+  );
 }
-function CreateViewForm({ onFeatureCreated }: CreateViewFormProps) {
+
+function useCurrentFeatureName(): string | null {
+  const location = useLocation();
+  const pathParts = location.pathname.split("/").filter(notEmpty);
+  if (
+    pathParts.length < 2 ||
+    pathParts[0] !== "feature" ||
+    pathParts[1].length === 0
+  ) {
+    return null;
+  }
+
+  const featureName = pathParts[1];
+
+  return featureName;
+}
+function notEmpty(value: string): boolean {
+  return value.length > 0;
+}
+
+interface CreateViewFormProps {
+  currentFeatureName: string | null;
+  onFeatureCreated(feature: any): void;
+  promptInstructions?: string;
+}
+function CreateViewForm({
+  currentFeatureName,
+  onFeatureCreated,
+  promptInstructions,
+}: CreateViewFormProps) {
   type CreateViewData = {
     prompt: string;
   };
@@ -45,6 +120,9 @@ function CreateViewForm({ onFeatureCreated }: CreateViewFormProps) {
     try {
       const body = new URLSearchParams();
       body.set("prompt", data.prompt);
+      if (currentFeatureName != null) {
+        body.set("feature", currentFeatureName);
+      }
       const response = await fetch("/create-feature", {
         method: "post",
         headers: {
@@ -88,9 +166,11 @@ function CreateViewForm({ onFeatureCreated }: CreateViewFormProps) {
       {isSubmitting ? (
         <Loader />
       ) : (
-        <Row className="justify-content-center">
-          <Col xs="auto">Prompt something to create a new feature</Col>
-        </Row>
+        promptInstructions != null && (
+          <Row className="justify-content-center">
+            <Col xs="auto">{promptInstructions}</Col>
+          </Row>
+        )
       )}
     </>
   );

@@ -13,7 +13,7 @@ import (
 )
 
 type IFeatureGenerator interface {
-	GenerateFeature(ctx context.Context, prompt string) (*Feature, error)
+	GenerateFeature(ctx context.Context, prompt string, featureContext *Feature) (*Feature, error)
 }
 
 func NewReactFeatureGenerator(db *sql.DB, featureStore IFeatureStore, aiGenerator IAIGenerator, frontendBuilder frontend.IBuilder) IFeatureGenerator {
@@ -32,9 +32,9 @@ type ReactFeatureGenerator struct {
 	frontendBuilder frontend.IBuilder
 }
 
-func (g *ReactFeatureGenerator) GenerateFeature(ctx context.Context, prompt string) (*Feature, error) {
+func (g *ReactFeatureGenerator) GenerateFeature(ctx context.Context, prompt string, featureContext *Feature) (*Feature, error) {
 
-	feature, err := g.aiGenerator.Generate(ctx, prompt)
+	feature, err := g.aiGenerator.Generate(ctx, prompt, featureContext)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create page component view: %w", err)
 	}

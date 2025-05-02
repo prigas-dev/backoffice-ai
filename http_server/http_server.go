@@ -112,8 +112,8 @@ func NewTestAIGenerator() features.IAIGenerator {
 	return &TestAIGenerator{}
 }
 
-func (g *TestAIGenerator) Generate(ctx context.Context, prompt string) (*features.Feature, error) {
-	featureJson, err := os.ReadFile("AiGeneratedViews/b701b9f0-21e7-44fe-ba2a-f488521ecffa.json")
+func (g *TestAIGenerator) Generate(ctx context.Context, prompt string, featureContext *features.Feature) (*features.Feature, error) {
+	featureJson, err := os.ReadFile("AiGeneratedViews/kanban-board.json")
 	if err != nil {
 		return nil, err
 	}

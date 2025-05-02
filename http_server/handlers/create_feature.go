@@ -26,13 +26,29 @@ func CreateFeature(container *gosyringe.Container) {
 			return
 		}
 
+		var featureContext *features.Feature = nil
+		currentFeatureName := r.Form.Get("feature")
+		if len(currentFeatureName) > 0 {
+			featureStore, err := gosyringe.Resolve[features.IFeatureStore](container)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			featureContext, err = featureStore.GetFeature(currentFeatureName)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+
 		featureGenerator, err := gosyringe.Resolve[features.IFeatureGenerator](container)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		feature, err := featureGenerator.GenerateFeature(ctx, prompt)
+		feature, err := featureGenerator.GenerateFeature(ctx, prompt, featureContext)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

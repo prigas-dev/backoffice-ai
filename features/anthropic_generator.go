@@ -2,7 +2,6 @@ package features
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,7 +16,7 @@ import (
 )
 
 type IAIGenerator interface {
-	Generate(ctx context.Context, prompt string) (*Feature, error)
+	Generate(ctx context.Context, prompt string, featureContext *Feature) (*Feature, error)
 }
 
 type Feature struct {
@@ -32,10 +31,15 @@ type ReactComponent struct {
 	TsxCode string `json:"tsxCode"`
 }
 
-func NewAIGenerator(db *sql.DB, databaseSchemaGenerator IDatabaseSchemaGenerator, instructionsTemplateData *InstructionsTemplateData) IAIGenerator {
-	return &AnthropicGenerator{
-		db:                      db,
-		databaseSchemaGenerator: databaseSchemaGenerator,
+func NewAIGenerator(databaseSchemaGenerator IDatabaseSchemaGenerator, instructionsTemplateData *InstructionsTemplateData) (IAIGenerator, error) {
+
+	schema, err := databaseSchemaGenerator.GenerateSchemaSQL()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get db schema: %w", err)
+	}
+
+	log.Println("Got schema from SQLite3 database")
+	anthropicGenerator := &AnthropicGenerator{
 		instructionsTemplateData: &AnthropicInstructionsTemplateData{
 			SystemName:        instructionsTemplateData.SystemName,
 			SystemDescription: instructionsTemplateData.SystemDescription,
@@ -45,8 +49,10 @@ func NewAIGenerator(db *sql.DB, databaseSchemaGenerator IDatabaseSchemaGenerator
 			ErrorJSONSchema:   instruction_files.ErrorJSONSchema.Content,
 			ValidFeatureJSON:  instruction_files.ExampleFeatureJSON.Content,
 			ValidFeatureFiles: instruction_files.ExampleFeatureFiles,
+			DatabaseSchema:    schema,
 		},
 	}
+	return anthropicGenerator, nil
 }
 
 type InstructionsTemplateData struct {
@@ -57,8 +63,6 @@ type InstructionsTemplateData struct {
 }
 
 type AnthropicGenerator struct {
-	db                       *sql.DB
-	databaseSchemaGenerator  IDatabaseSchemaGenerator
 	instructionsTemplateData *AnthropicInstructionsTemplateData
 }
 
@@ -73,21 +77,35 @@ type AnthropicInstructionsTemplateData struct {
 	FeatureJSONSchema string
 	ValidFeatureJSON  string
 	ValidFeatureFiles []instruction_files.File
+
+	FeatureContext string
 }
 
-func (g *AnthropicGenerator) Generate(ctx context.Context, prompt string) (*Feature, error) {
+func (g *AnthropicGenerator) Generate(ctx context.Context, prompt string, featureContext *Feature) (*Feature, error) {
 
 	client := anthropic.NewClient()
 
-	schema, err := g.databaseSchemaGenerator.GenerateSchemaSQL()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get db schema: %w", err)
+	templateData := AnthropicInstructionsTemplateData{
+		SystemName:        g.instructionsTemplateData.SystemName,
+		SystemDescription: g.instructionsTemplateData.SystemDescription,
+		DatabaseEngine:    g.instructionsTemplateData.DatabaseEngine,
+		DatabaseHints:     g.instructionsTemplateData.DatabaseHints,
+		DatabaseSchema:    g.instructionsTemplateData.DatabaseSchema,
+		ErrorJSONSchema:   g.instructionsTemplateData.ErrorJSONSchema,
+		FeatureJSONSchema: g.instructionsTemplateData.FeatureJSONSchema,
+		ValidFeatureJSON:  g.instructionsTemplateData.ValidFeatureJSON,
+		ValidFeatureFiles: g.instructionsTemplateData.ValidFeatureFiles,
 	}
 
-	log.Println("Got schema from SQLite3 database")
+	if featureContext != nil {
+		featureContextEncoded, err := json.MarshalIndent(featureContext, "", "  ")
+		if err != nil {
+			return nil, fmt.Errorf("failed to JSON encode featureContext: %w", err)
+		}
+		templateData.FeatureContext = string(featureContextEncoded)
+	}
 
-	g.instructionsTemplateData.DatabaseSchema = schema
-	instructions, err := utils.DoTemplate("system-instructions", instruction_files.SystemInstructionsTemplate.Content, g.instructionsTemplateData)
+	instructions, err := utils.DoTemplate("system-instructions", instruction_files.SystemInstructionsTemplate.Content, templateData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate instructions: %w", err)
 	}

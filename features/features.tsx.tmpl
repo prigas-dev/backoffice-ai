@@ -1,0 +1,7 @@
+import { FC, lazy } from "react";
+
+export const FeatureComponents: Record<string, FC> = {
+{{range .ComponentNames}}
+  "{{.}}": lazy(() => import("./components/{{.}}")),
+{{- end}}
+};

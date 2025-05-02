@@ -40,7 +40,7 @@ func (s *FsComponentStore) AddComponent(name string, tsxCode []byte) error {
 		return fmt.Errorf("failed to write component file: %w", err)
 	}
 
-	err = s.regenerateRoot()
+	err = s.regenerateFeatureComponentsList()
 	if err != nil {
 		return fmt.Errorf("failed to regenerate root: %w", err)
 	}
@@ -48,10 +48,10 @@ func (s *FsComponentStore) AddComponent(name string, tsxCode []byte) error {
 	return nil
 }
 
-//go:embed main.tsx.tmpl
-var mainTsxTemplate string
+//go:embed features.tsx.tmpl
+var featuresTsxTemplate string
 
-func (s *FsComponentStore) regenerateRoot() error {
+func (s *FsComponentStore) regenerateFeatureComponentsList() error {
 	componentNames := []string{}
 	componentFiles, err := afero.ReadDir(s.fs, componentsFolder)
 	if err != nil {
@@ -72,17 +72,17 @@ func (s *FsComponentStore) regenerateRoot() error {
 		componentNames = append(componentNames, componentName)
 	}
 
-	mainTsx, err := utils.DoTemplate("main.tsx", mainTsxTemplate, map[string]any{
+	featuresTsx, err := utils.DoTemplate("features.tsx", featuresTsxTemplate, map[string]any{
 		"ComponentNames": componentNames,
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to generate main.tsx: %w", err)
+		return fmt.Errorf("failed to generate features.tsx: %w", err)
 	}
 
-	err = afero.WriteFile(s.fs, "src/main.tsx", []byte(mainTsx), 0755)
+	err = afero.WriteFile(s.fs, "src/features.tsx", []byte(featuresTsx), 0755)
 	if err != nil {
-		return fmt.Errorf("failed to write main.tsx file: %w", err)
+		return fmt.Errorf("failed to write features.tsx file: %w", err)
 	}
 
 	return nil

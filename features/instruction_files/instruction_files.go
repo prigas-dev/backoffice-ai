@@ -8,7 +8,7 @@ type File struct {
 	Content                    string
 }
 
-//go:embed system-instructions-v2.txt
+//go:embed system-instructions-v3.txt
 var systemInstructionsTemplateContent string
 var SystemInstructionsTemplate = &File{
 	MarkdownLanguageIdentifier: "plaintext",

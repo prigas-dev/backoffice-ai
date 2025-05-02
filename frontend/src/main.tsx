@@ -6,48 +6,19 @@ import {
   Link,
   Outlet,
   RouterProvider,
+  useLocation,
 } from "@tanstack/react-router";
-import { FC, lazy, StrictMode, Suspense } from "react";
+import { StrictMode, Suspense } from "react";
 import { Col, Container, Nav, Navbar, Row, Spinner } from "react-bootstrap";
 import { createRoot } from "react-dom/client";
-import { Prompt } from "./Prompt";
-
-const FeatureComponents: Record<string, FC> = {
-
-  "kanban-board": lazy(() => import("./components/kanban-board")),
-
-  "task-statistics-dashboard": lazy(() => import("./components/task-statistics-dashboard")),
-
-};
+import { Prompt, PromptCornerButton } from "./Prompt";
+import { FeatureComponents } from "./features";
 
 window.addEventListener("DOMContentLoaded", async function () {
   const features = await getFeatures();
 
   const rootRoute = createRootRoute({
-    component: () => (
-      <>
-        <Navbar bg="primary" data-bs-theme="dark">
-          <Container>
-            <Navbar.Brand href="#home">Backoffice AI</Navbar.Brand>
-            <Nav className="me-auto">
-              <Nav.Link as={Link} to="/">
-                Home
-              </Nav.Link>
-              {features.map((feature) => (
-                <Nav.Link
-                  key={feature.name}
-                  as={Link}
-                  to={`/feature/${feature.name}`}
-                >
-                  {feature.label}
-                </Nav.Link>
-              ))}
-            </Nav>
-          </Container>
-        </Navbar>
-        <Outlet />
-      </>
-    ),
+    component: () => <RootComponent features={features} />,
   });
 
   const featureRoutes = features.map((feature) => {
@@ -66,7 +37,11 @@ window.addEventListener("DOMContentLoaded", async function () {
   const indexRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: "/",
-    component: Prompt,
+    component: () => (
+      <Container>
+        <Prompt promptInstructions="Prompt something to create a new feature" />
+      </Container>
+    ),
   });
 
   const routeTree = rootRoute.addChildren([indexRoute, ...featureRoutes]);
@@ -98,6 +73,39 @@ window.addEventListener("DOMContentLoaded", async function () {
     </StrictMode>
   );
 });
+
+function RootComponent({ features }: { features: FeatureManifest[] }) {
+  const location = useLocation();
+  const pathname = location.pathname;
+
+  return (
+    <>
+      <Navbar bg="primary" data-bs-theme="dark">
+        <Container>
+          <Navbar.Brand href="#home">Backoffice AI</Navbar.Brand>
+          <Nav className="me-auto">
+            <Nav.Link as={Link} to="/">
+              Home
+            </Nav.Link>
+            {features.map((feature) => (
+              <Nav.Link
+                key={feature.name}
+                as={Link}
+                to={`/feature/${feature.name}`}
+              >
+                {feature.label}
+              </Nav.Link>
+            ))}
+          </Nav>
+        </Container>
+      </Navbar>
+
+      <PromptCornerButton />
+
+      <Outlet />
+    </>
+  );
+}
 
 type FeatureManifest = {
   name: string;
